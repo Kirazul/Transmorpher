@@ -1,9 +1,7 @@
 # Transmorpher (3.3.5a)
+![Transmorpher Screenshot](images/screenshot.png)
 
 A high-performance **transmog addon and morpher** for World of Warcraft 3.3.5a (12340).
-
-## Repository
-[https://github.com/Kirazul/Transmorpher](https://github.com/Kirazul/Transmorpher)
 
 ## What it does
 Transmorpher is a powerful tool that gives you complete control over your character's visual appearance. It allows you to change how you look to yourself without affecting your actual gear, stats, or other players.
