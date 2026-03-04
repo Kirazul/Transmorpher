@@ -1,0 +1,6 @@
+EXPORTS
+    DirectInput8Create=dinput8_DirectInput8Create @1
+    GetdfDIJoystick=dinput8_GetdfDIJoystick @2
+    GetdfDIKeyboard=dinput8_GetdfDIKeyboard @3
+    GetdfDIMouse=dinput8_GetdfDIMouse @4
+    GetdfDIMouse2=dinput8_GetdfDIMouse2 @5
