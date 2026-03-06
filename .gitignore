@@ -1,0 +1,17 @@
+# Build files
+StealthMorpher/build/
+Transmorpher/build/
+
+# IDE files
+.vs/
+*.user
+*.suo
+*.sln
+*.vcxproj
+*.filters
+
+# Logs
+*.log
+
+# WoW Local Settings (Addon)
+Transmorpher/SavedVariables/

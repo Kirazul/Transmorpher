@@ -1,0 +1,21 @@
+## Interface: 30300
+## Author: VaultGate
+## Title: Transmorpher
+## Notes: Client-side Transmog system for WotLK 3.3.5a. Requires dinput8.dll.
+## SavedVariables: TransmorpherSavedLooks
+## SavedVariables: TransmorpherSettings
+## SavedVariablesPerCharacter: TransmorpherCharacterState
+## Version: 1.0.1
+
+db\ItemsDB.lua
+db\ItemsAPI.lua
+db\PreviewSetupDB.lua
+db\PreviewSetupAPI.lua
+
+frames\QueryItem.lua
+frames\WowheadURL.lua
+frames\DressingRoom.lua
+frames\PreviewList.lua
+frames\ListFrame.lua
+
+Transmorpher.lua
