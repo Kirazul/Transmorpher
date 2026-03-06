@@ -1622,10 +1622,7 @@ do
                     local now = GetTime()
                     if now - lastMorphCheck > 0.02 then -- Very aggressive throttle for form changes
                         lastMorphCheck = now
-                        
-                        -- Set to near-instant (1 frame) for both entering and leaving forms
-                        local delay = 0.01
-                        TriggerReapply(delay)
+                        TriggerReapply(0.01)
                     end
                 end
             end
