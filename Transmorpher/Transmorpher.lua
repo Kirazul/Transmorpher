@@ -1631,20 +1631,24 @@ do
                             -- Phase 1: Instant re-apply
                             TriggerReapply(0.01)
                             
-                            -- Phase 2: Ultra Burst restoration for 0.1 seconds
-                            -- Hammer the morph command every single game frame to kill any potential blink.
+                            -- Phase 2: Fast Burst restoration for 0.2 seconds
+                            -- Re-applies every 0.02s to kill the blink instantly and then stop.
                             local burst = CreateFrame("Frame")
                             burst.totalTime = 0
+                            burst.lastUpdate = 0
                             burst:SetScript("OnUpdate", function(self, elapsed)
                                 self.totalTime = self.totalTime + elapsed
-                                if self.totalTime > 0.1 then -- Done after 100ms
+                                if self.totalTime > 0.2 then -- End max in 0.2s
                                     self:Hide()
                                     self:SetScript("OnUpdate", nil)
                                     return
                                 end
                                 
-                                -- Run every single frame (No throttle, absolute speed)
-                                ReapplyCurrentMorph()
+                                -- Run every 0.02s (High frequency)
+                                if self.totalTime - self.lastUpdate > 0.02 then
+                                    self.lastUpdate = self.totalTime
+                                    ReapplyCurrentMorph()
+                                end
                             end)
                         end
                     end
