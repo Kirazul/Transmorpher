@@ -32,7 +32,7 @@ Check the [Releases](https://github.com/Kirazul/Transmorpher/releases) section f
 - Full Source Code.
 
 
-## Changelog (1.1.0)
+## Changelog (1.0.2)
 - **Weapon Transmog Overhaul**: Improved weapon transmog handling for both main-hand and off-hand slots.
 - **Stealth & Combat Fix**: Fixed weapon transmogs being removed when stealthing/unstealthing, entering combat, or leaving combat.
 - **Deathbringer's Will Fix**: Fixed Deathbringer's Will procs removing the morph.
