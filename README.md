@@ -15,14 +15,6 @@ Transmorpher provides a powerful interface for customizing character appearance,
 
 ![Screenshot](images/Capture%20d'écran%202026-03-04%20132756.png)
 
-![Screenshot](images/Capture%20d'écran%202026-03-04%20132847.png)
-
-![Screenshot](images/Capture%20d'écran%202026-03-04%20132923.png)
-
-![Screenshot](images/Capture%20d'écran%202026-03-04%20133238.png)
-
-![Screenshot](images/Capture%20d'écran%202026-03-04%20134457.png)
-
 # Features
 
 Transmorpher allows you to morph and customize the following elements:
@@ -86,3 +78,11 @@ Current release: **1.1.1**
 - World of Warcraft **Wrath of the Lich King 3.3.5a**
 - Client-side only functionality
 - Does not modify server data
+
+![Screenshot](images/Capture%20d'écran%202026-03-04%20132847.png)
+
+![Screenshot](images/Capture%20d'écran%202026-03-04%20132923.png)
+
+![Screenshot](images/Capture%20d'écran%202026-03-04%20133238.png)
+
+![Screenshot](images/Capture%20d'écran%202026-03-04%20134457.png)
