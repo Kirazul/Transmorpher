@@ -1,6 +1,6 @@
 local addon, ns = ...
 
-local mainFrameTitle = "|cffF5C842Transmorpher|r  |cff6a6050v1.0.4|r"
+local mainFrameTitle = "|cffF5C842Transmorpher|r  |cff6a6050v1.1.0|r"
 
 -- ============================================================
 -- CUSTOM GOLDEN BUTTON STYLE
@@ -207,6 +207,11 @@ TRANSMORPHER_DLL_LOADED = false  -- Global variable the DLL sets when loaded
 
 -- Track whether the DLL has been told to suspend (model-changing form active)
 local morphSuspended = false
+local vehicleSuspended = false
+local savedMountDisplayForVehicle = nil
+
+-- Vehicle guard: track last known vehicle state for OnUpdate polling
+local wasInVehicleLastFrame = false
 
 local function IsModelChangingForm()
     -- If user wants morph to persist in shapeshift forms, never suspend
@@ -224,6 +229,11 @@ local function IsModelChangingForm()
     end
     
     return false
+end
+
+local function IsInVehicle()
+    -- Check if player is in a vehicle (cannons, siege engines, etc.)
+    return UnitInVehicle("player")
 end
 
 -- Deathbringer's Will proc spell IDs (Normal + Heroic)
@@ -254,6 +264,9 @@ local function HasDBWProc()
     return false
 end
 
+-- ============================================================
+-- WEAPON SET SYSTEM - Save different morphs per weapon config
+-- ============================================================
 local function TrackMorphCommand(cmd)
     if not GetSettings().saveMorphState then return end
     if not TransmorpherCharacterState then TransmorpherCharacterState = {Items={}, Morph=nil, Scale=nil, MountDisplay=nil, PetDisplay=nil, HunterPetDisplay=nil, HunterPetScale=nil, EnchantMH=nil, EnchantOH=nil} end
@@ -264,7 +277,9 @@ local function TrackMorphCommand(cmd)
         local prefix = parts[1]
         
         if prefix == "ITEM" and parts[2] and parts[3] then
-            TransmorpherCharacterState.Items[tonumber(parts[2])] = tonumber(parts[3])
+            local slotId = tonumber(parts[2])
+            local itemId = tonumber(parts[3])
+            TransmorpherCharacterState.Items[slotId] = itemId
         elseif prefix == "MORPH" and parts[2] then
             local val = tonumber(parts[2])
             if val and val > 0 then
@@ -317,9 +332,17 @@ local function TrackMorphCommand(cmd)
             TransmorpherCharacterState.EnchantOH = nil
         elseif prefix == "RESET" and parts[2] then
             if parts[2] == "ALL" then
-                TransmorpherCharacterState = {Items={}, Morph=nil, Scale=nil, MountDisplay=nil, PetDisplay=nil, HunterPetDisplay=nil, HunterPetScale=nil, EnchantMH=nil, EnchantOH=nil}
+                TransmorpherCharacterState = {Items={}, Morph=nil, Scale=nil, MountDisplay=nil, PetDisplay=nil, HunterPetDisplay=nil, HunterPetScale=nil, EnchantMH=nil, EnchantOH=nil, WeaponSets={}}
             else
-                TransmorpherCharacterState.Items[tonumber(parts[2])] = nil
+                local slotId = tonumber(parts[2])
+                TransmorpherCharacterState.Items[slotId] = nil
+                -- Clear from weapon set if it's a weapon slot
+                if slotId == 16 or slotId == 17 then
+                    local setKey = GetWeaponSetKey()
+                    if TransmorpherCharacterState.WeaponSets[setKey] then
+                        TransmorpherCharacterState.WeaponSets[setKey][slotId] = nil
+                    end
+                end
             end
         end
     end
@@ -582,7 +605,7 @@ local function SendFullMorphState()
     if not TransmorpherCharacterState then
         return
     end
-    if IsModelChangingForm() or dbwSuspended then return end
+    if IsModelChangingForm() or dbwSuspended or vehicleSuspended then return end
 
     local cmdQueue = {}
     if TransmorpherCharacterState.Scale then table.insert(cmdQueue, "SCALE:"..TransmorpherCharacterState.Scale) end
@@ -2140,8 +2163,18 @@ do
                 if self.isMorphed then
                     if self.cmd == "ENCHANT_MH" then
                         SendMorphCommand("ENCHANT_RESET_MH")
+                        -- Clear from weapon set
+                        local setKey = GetWeaponSetKey()
+                        if TransmorpherCharacterState.WeaponSets[setKey] then
+                            TransmorpherCharacterState.WeaponSets[setKey].EnchantMH = nil
+                        end
                     elseif self.cmd == "ENCHANT_OH" then
                         SendMorphCommand("ENCHANT_RESET_OH")
+                        -- Clear from weapon set
+                        local setKey = GetWeaponSetKey()
+                        if TransmorpherCharacterState.WeaponSets[setKey] then
+                            TransmorpherCharacterState.WeaponSets[setKey].EnchantOH = nil
+                        end
                     end
                 end
                 self.isMorphed = false
@@ -3930,17 +3963,18 @@ do
 
     -- Race display IDs: [race][gender] = displayId
     -- gender: 1 = neutral/unknown, 2 = male, 3 = female
+    -- EXACT working IDs verified in-game
     local raceDisplayIds = {
-        ["Human"]      = { [2] = 49,    [3] = 50 },
-        ["Orc"]        = { [2] = 51,    [3] = 52 },
-        ["Dwarf"]      = { [2] = 53,    [3] = 54 },
-        ["Night Elf"]  = { [2] = 55,    [3] = 56 },
-        ["Undead"]     = { [2] = 57,    [3] = 58 },
-        ["Tauren"]     = { [2] = 59,    [3] = 60 },
-        ["Gnome"]      = { [2] = 1563,  [3] = 1564 },
-        ["Troll"]      = { [2] = 1478,  [3] = 1479 },
-        ["Blood Elf"]  = { [2] = 15476, [3] = 15475 },
-        ["Draenei"]    = { [2] = 16125, [3] = 16126 },
+        ["Human"]      = { [2] = 19723, [3] = 19724 },  -- Exact from SimplyMorpher3
+        ["Orc"]        = { [2] = 6785,  [3] = 20316 },  -- Male: verified working, Female: exact
+        ["Dwarf"]      = { [2] = 20317, [3] = 13250 },  -- Male: exact, Female: first from SimplyMorpher3 list
+        ["Night Elf"]  = { [2] = 20318, [3] = 2222  },  -- Male: exact, Female: verified working
+        ["Undead"]     = { [2] = 28193, [3] = 23112 },  -- Both: first from SimplyMorpher3 lists
+        ["Tauren"]     = { [2] = 20585, [3] = 20584 },  -- Both exact from SimplyMorpher3
+        ["Gnome"]      = { [2] = 20580, [3] = 20581 },  -- Both exact from SimplyMorpher3
+        ["Troll"]      = { [2] = 20321, [3] = 4358  },  -- Male: exact, Female: verified working
+        ["Blood Elf"]  = { [2] = 20578, [3] = 20579 },  -- Both exact from SimplyMorpher3
+        ["Draenei"]    = { [2] = 17155, [3] = 20323 },  -- Male: verified working, Female: exact
     }
     local raceOrder = {"Human", "Orc", "Dwarf", "Night Elf", "Undead", "Tauren", "Gnome", "Troll", "Blood Elf", "Draenei"}
     local raceIcons = {
@@ -5876,13 +5910,13 @@ do
         if not enabled and dbwSuspended then
             -- User turned it off while DBW was suspending: resume immediately
             dbwSuspended = false
-            if not morphSuspended then
+            if not morphSuspended and not vehicleSuspended then
                 SendRawMorphCommand("RESUME")
             end
         elseif enabled and not dbwSuspended and HasDBWProc() then
             -- User turned it on while a DBW proc is active: suspend immediately
             dbwSuspended = true
-            if not morphSuspended then
+            if not morphSuspended and not vehicleSuspended then
                 SendRawMorphCommand("SUSPEND")
             end
         end
@@ -5897,13 +5931,13 @@ do
         if enabled and morphSuspended then
             -- User wants morph in shapeshift: resume immediately
             morphSuspended = false
-            if not dbwSuspended then
+            if not dbwSuspended and not vehicleSuspended then
                 SendRawMorphCommand("RESUME")
             end
         elseif not enabled and IsModelChangingForm() and not morphSuspended then
             -- User turned it off while in a form: suspend immediately
             morphSuspended = true
-            if not dbwSuspended then
+            if not dbwSuspended and not vehicleSuspended then
                 SendRawMorphCommand("SUSPEND")
             end
         end
@@ -6003,7 +6037,7 @@ do
     infoText:SetJustifyH("LEFT")
     infoText:SetJustifyV("TOP")
     infoText:SetTextColor(0.95, 0.88, 0.65)
-    infoText:SetText("Transmorpher v1.0.3\n\nTransform your character, mounts, and pets with custom appearances.\nUse the tabs above to browse and apply morphs.")
+    infoText:SetText("Transmorpher v1.0.9\n\nA client-side transmog system for WotLK 3.3.5a.\nTransform your character appearance, equipment, mounts, and pets.\nRequires dinput8.dll to function.")
     
     yOffset = yOffset - 70
     
@@ -6024,12 +6058,81 @@ do
     mainFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
     mainFrame:RegisterEvent("UNIT_MODEL_CHANGED")
     mainFrame:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
+    -- Smart Interaction Intervention: Kill morpher BEFORE interaction happens
+    local function HandleSmartIntervention(unit)
+        if unit and UnitExists(unit) then
+            local name = UnitName(unit) or ""
+            local isVehicle = false
+            
+            -- Automated Seat Detection (Covers Mammoths, Choppers, Raid Vehicles)
+            local seatCount = UnitVehicleSeatCount(unit)
+            if seatCount and seatCount > 0 then
+                isVehicle = true
+            end
+            
+            -- Keyword Detection (Covers Objects, Quest Vehicles, and non-seat interactions)
+            if not isVehicle then
+                local patterns = {
+                    "Chopper", "Salvaged", "Demolisher", "Siege", "Engine", "Cannon", "Canon", "Harpoon",
+                    "Turret", "Teleporter", "Drake", "Dragon", "Tank", "Golem", "Robot", "Machine", 
+                    "Plane", "Ship", "Boat", "Zeppelin", "Bomber", "Steam", "Flame", 
+                    "Leviathan", "Mimiron", "Gryphon", "Wyvern", "Bat", "Hawkstrider", "Catapult", 
+                    "Car", "Shuttle", "Submarine", "Valkyrie", "Mammoth", "Motor", "Bike", "Cycle", 
+                    "Rider", "Pilot", "Gunner", "Azure", "Amber", "Emerald", "Scion", "Proto-Drake", 
+                    "Aerial", "Command", "Platform", "Guardian", "Sentinel", "Constructor", 
+                    "Mechano", "Turbo", "Automatic", "Flying", "Hover", "Glider", "Sled", "Rocket", 
+                    "Blimp", "Balloon", "Gnome", "Goblin", "Experimental", "Constructor", "Security", 
+                    "Defense", "Assault", "War", "Combat", "Battle", "Transport", "Portal", 
+                    "Focus", "Nexus", "Pulse", "Energy", "Beam", "Static", "Launcher", "Ram"
+                }
+                for _, p in ipairs(patterns) do
+                    if name:find(p) then
+                        isVehicle = true
+                        break
+                    end
+                end
+            end
+
+            if isVehicle then
+                if not vehicleSuspended then
+                    vehicleSuspended = true
+                    if TransmorpherCharacterState and TransmorpherCharacterState.MountDisplay then
+                        savedMountDisplayForVehicle = TransmorpherCharacterState.MountDisplay
+                        TRANSMORPHER_CMD = "MOUNT_RESET|SUSPEND"
+                        TransmorpherCharacterState.MountDisplay = nil
+                    else
+                        SendRawMorphCommand("SUSPEND")
+                    end
+                end
+            end
+        end
+    end
+
+    WorldFrame:HookScript("OnMouseDown", function(_, button)
+        if button == "RightButton" then
+            HandleSmartIntervention("mouseover")
+        end
+    end)
+
+    local origInteractUnit = InteractUnit
+    InteractUnit = function(unit)
+        HandleSmartIntervention(unit)
+        return origInteractUnit(unit)
+    end
     mainFrame:RegisterEvent("UNIT_AURA")
     mainFrame:RegisterEvent("CHAT_MSG_ADDON")
     mainFrame:RegisterEvent("PLAYER_LOGIN")
+    mainFrame:RegisterEvent("UNIT_INVENTORY_CHANGED")
+    mainFrame:RegisterEvent("UNIT_ENTERED_VEHICLE")
+    mainFrame:RegisterEvent("UNIT_EXITED_VEHICLE")
+    
     -- Track form state for edge detection (only act on transitions)
     local lastKnownForm = -1
     local lastKnownMounted = false
+    
+    -- Track weapon state for enchant persistence
+    local lastMainHand = nil
+    local lastOffHand = nil
 
     -- One-shot delayed send (reusable timer, no CreateFrame spam)
     local delayedSendTimer = CreateFrame("Frame")
@@ -6051,13 +6154,13 @@ do
         if event == "PLAYER_LOGIN" then
             -- Initialize per-character SavedVariables
             if not TransmorpherCharacterState then
-                TransmorpherCharacterState = {Items={}, Morph=nil, Scale=nil, MountDisplay=nil, PetDisplay=nil, HunterPetDisplay=nil, HunterPetScale=nil}
+                TransmorpherCharacterState = {Items={}, Morph=nil, Scale=nil, MountDisplay=nil, PetDisplay=nil, HunterPetDisplay=nil, HunterPetScale=nil, EnchantMH=nil, EnchantOH=nil}
             end
             if not TransmorpherCharacterState.Items then
                 TransmorpherCharacterState.Items = {}
             end
             
-            -- Initialize weapon tracking
+            -- Initialize weapon tracking (assign to module-level variables)
             lastMainHand = GetInventoryItemLink("player", 16)
             lastOffHand = GetInventoryItemLink("player", 17)
 
@@ -6075,7 +6178,15 @@ do
             lastKnownMounted = IsMounted() or false
             morphSuspended = IsModelChangingForm()
             dbwSuspended = GetSettings().showDBWProc and HasDBWProc() or false
-            if morphSuspended or dbwSuspended then
+            vehicleSuspended = IsInVehicle()
+            
+            -- If already in vehicle on login, clear mount morph immediately
+            if vehicleSuspended and TransmorpherCharacterState and TransmorpherCharacterState.MountDisplay then
+                savedMountDisplayForVehicle = TransmorpherCharacterState.MountDisplay
+                SendMorphCommand("MOUNT_RESET")
+            end
+            
+            if morphSuspended or dbwSuspended or vehicleSuspended then
                 SendRawMorphCommand("SUSPEND")
             else
                 -- PLAYER_ENTERING_WORLD will fire shortly and override this
@@ -6092,7 +6203,15 @@ do
             lastKnownMounted = IsMounted() or false
             morphSuspended = IsModelChangingForm()
             dbwSuspended = GetSettings().showDBWProc and HasDBWProc() or false
-            if morphSuspended or dbwSuspended then
+            vehicleSuspended = IsInVehicle()
+            
+            -- If in vehicle after zone change, clear mount morph immediately
+            if vehicleSuspended and TransmorpherCharacterState and TransmorpherCharacterState.MountDisplay then
+                savedMountDisplayForVehicle = TransmorpherCharacterState.MountDisplay
+                SendMorphCommand("MOUNT_RESET")
+            end
+            
+            if morphSuspended or dbwSuspended or vehicleSuspended then
                 SendRawMorphCommand("SUSPEND")
             else
                 ScheduleMorphSend(0.05)
@@ -6108,13 +6227,13 @@ do
             if inModelForm and not morphSuspended then
                 -- ENTERING a model-changing form
                 morphSuspended = true
-                if not dbwSuspended then
+                if not dbwSuspended and not vehicleSuspended then
                     SendRawMorphCommand("SUSPEND")
                 end
             elseif not inModelForm and morphSuspended then
                 -- LEAVING a model-changing form
                 morphSuspended = false
-                if not dbwSuspended then
+                if not dbwSuspended and not vehicleSuspended then
                     SendRawMorphCommand("RESUME")
                 end
             end
@@ -6142,13 +6261,13 @@ do
             if hasDBW and not dbwSuspended then
                 -- DBW proc started: suspend morph so player sees the proc form
                 dbwSuspended = true
-                if not morphSuspended then
+                if not morphSuspended and not vehicleSuspended then
                     SendRawMorphCommand("SUSPEND")
                 end
             elseif not hasDBW and dbwSuspended then
                 -- DBW proc ended: resume morph if shapeshift isn't also suspending
                 dbwSuspended = false
-                if not morphSuspended then
+                if not morphSuspended and not vehicleSuspended then
                     SendRawMorphCommand("RESUME")
                 end
             end
@@ -6157,62 +6276,155 @@ do
             local unit = ...
             if unit ~= "player" then return end
             
-            -- Check weapon changes to clear invalid morphs
+            -- Check weapon changes to reapply enchants
             local currentMainHand = GetInventoryItemLink("player", 16)
             local currentOffHand = GetInventoryItemLink("player", 17)
             
-            -- Detect weapon slot changes
+            -- Detect weapon slot changes (fire if EITHER weapon changed)
             if currentMainHand ~= lastMainHand or currentOffHand ~= lastOffHand then
-                -- Main-hand changed
-                if currentMainHand ~= lastMainHand then
-                    local slot = mainFrame.slots["Main Hand"]
-                    if slot and slot.isMorphed then
-                        -- Check if new weapon is compatible with morph
-                        local newItemId = GetInventoryItemID("player", 16)
-                        if newItemId ~= slot.morphedItemId then
-                            -- Weapon changed, clear morph
-                            SendMorphCommand("ITEM:16:0")
-                            slot.isMorphed = false
-                            slot.morphedItemId = nil
-                            HideMorphGlow(slot)
-                            if TransmorpherCharacterState and TransmorpherCharacterState.Items then
-                                TransmorpherCharacterState.Items[12] = nil
-                            end
-                        end
-                    end
-                end
-                
-                -- Off-hand changed
-                if currentOffHand ~= lastOffHand then
-                    local slot = mainFrame.slots["Off-hand"]
-                    if slot and slot.isMorphed then
-                        -- Check if new weapon is compatible with morph
-                        local newItemId = GetInventoryItemID("player", 17)
-                        if newItemId ~= slot.morphedItemId then
-                            -- Off-hand changed, clear morph
-                            SendMorphCommand("ITEM:17:0")
-                            slot.isMorphed = false
-                            slot.morphedItemId = nil
-                            HideMorphGlow(slot)
-                            if TransmorpherCharacterState and TransmorpherCharacterState.Items then
-                                TransmorpherCharacterState.Items[13] = nil
-                            end
-                        end
-                    end
-                end
-                
                 -- Update tracked weapons
                 lastMainHand = currentMainHand
                 lastOffHand = currentOffHand
                 
+                -- Reapply saved enchants to the slots (regardless of which weapon is equipped)
+                if TransmorpherCharacterState then
+                    if TransmorpherCharacterState.EnchantMH and currentMainHand then
+                        SendMorphCommand("ENCHANT_MH:" .. TransmorpherCharacterState.EnchantMH)
+                        if mainFrame.enchantSlots and mainFrame.enchantSlots["Enchant MH"] then
+                            local eid = TransmorpherCharacterState.EnchantMH
+                            local eName = tostring(eid)
+                            if ns.enchantDB and ns.enchantDB[eid] then eName = ns.enchantDB[eid] end
+                            mainFrame.enchantSlots["Enchant MH"]:SetEnchant(eid, eName)
+                            mainFrame.enchantSlots["Enchant MH"].isMorphed = true
+                            ShowMorphGlow(mainFrame.enchantSlots["Enchant MH"], "orange")
+                        end
+                    end
+                    
+                    if TransmorpherCharacterState.EnchantOH and currentOffHand then
+                        SendMorphCommand("ENCHANT_OH:" .. TransmorpherCharacterState.EnchantOH)
+                        if mainFrame.enchantSlots and mainFrame.enchantSlots["Enchant OH"] then
+                            local eid = TransmorpherCharacterState.EnchantOH
+                            local eName = tostring(eid)
+                            if ns.enchantDB and ns.enchantDB[eid] then eName = ns.enchantDB[eid] end
+                            mainFrame.enchantSlots["Enchant OH"]:SetEnchant(eid, eName)
+                            mainFrame.enchantSlots["Enchant OH"].isMorphed = true
+                            ShowMorphGlow(mainFrame.enchantSlots["Enchant OH"], "orange")
+                        end
+                    end
+                end
+                
                 -- Sync UI
                 SyncDressingRoom()
+            end
+
+        elseif event == "UNIT_ENTERED_VEHICLE" then
+            local unit = ...
+            if unit ~= "player" then return end
+            -- Rapid vehicle entry detection
+            if not vehicleSuspended then
+                vehicleSuspended = true
+                if TransmorpherCharacterState and TransmorpherCharacterState.MountDisplay then
+                    savedMountDisplayForVehicle = TransmorpherCharacterState.MountDisplay
+                    TRANSMORPHER_CMD = "MOUNT_RESET|SUSPEND"
+                    TransmorpherCharacterState.MountDisplay = nil
+                else
+                    SendRawMorphCommand("SUSPEND")
+                end
+            end
+
+        elseif event == "UNIT_EXITED_VEHICLE" then
+            local unit = ...
+            if unit ~= "player" then return end
+            -- Restore state on exit
+            if vehicleSuspended then
+                vehicleSuspended = false
+                if savedMountDisplayForVehicle then
+                    TransmorpherCharacterState.MountDisplay = savedMountDisplayForVehicle
+                    TRANSMORPHER_CMD = "MOUNT_MORPH:" .. savedMountDisplayForVehicle .. "|RESUME"
+                    savedMountDisplayForVehicle = nil
+                    UpdateSpecialSlots()
+                else
+                    SendRawMorphCommand("RESUME")
+                end
             end
 
         elseif event == "CHAT_MSG_ADDON" then
             local prefix, msg, channel, sender = ...
             if (prefix == addonMessagePrefix or prefix == "DressMe") then
                 -- Reserved for future appearance sharing
+            end
+        end
+    end)
+end
+
+---------------- VEHICLE SAFETY GUARD ----------------
+-- Aggressive polling to prevent vehicle crashes
+-- Checks every frame if player entered a vehicle and immediately clears ALL morphs
+do
+    local vehicleGuardFrame = CreateFrame("Frame")
+    
+    vehicleGuardFrame:SetScript("OnUpdate", function(self, elapsed)
+        -- Check if DLL is loaded
+        if not TRANSMORPHER_DLL_LOADED then return end
+        
+        -- Check vehicle state
+        local inVehicle = UnitInVehicle("player")
+        
+        -- Smart Check for passenger seat mounts/units/objects
+        if not inVehicle then
+            local seatCount = UnitVehicleSeatCount("target")
+            if seatCount and seatCount > 0 then
+                inVehicle = true 
+            else
+                local name = UnitName("target") or ""
+                local patterns = {
+                    "Chopper", "Salvaged", "Demolisher", "Siege", "Engine", "Cannon", "Canon", "Harpoon",
+                    "Turret", "Teleporter", "Drake", "Dragon", "Tank", "Golem", "Robot", "Machine", 
+                    "Plane", "Ship", "Boat", "Zeppelin", "Bomber", "Steam", "Flame", 
+                    "Leviathan", "Mimiron", "Gryphon", "Wyvern", "Bat", "Hawkstrider", "Catapult", 
+                    "Car", "Shuttle", "Submarine", "Valkyrie", "Mammoth", "Motor", "Bike", "Cycle", 
+                    "Rider", "Pilot", "Gunner", "Azure", "Amber", "Emerald", "Scion", "Proto-Drake", 
+                    "Aerial", "Command", "Platform", "Guardian", "Sentinel", "Constructor", 
+                    "Mechano", "Turbo", "Automatic", "Flying", "Hover", "Glider", "Sled", "Rocket", 
+                    "Blimp", "Balloon", "Gnome", "Goblin", "Experimental", "Constructor", "Security", 
+                    "Defense", "Assault", "War", "Combat", "Battle", "Transport", "Portal", 
+                    "Focus", "Nexus", "Pulse", "Energy", "Beam", "Static", "Launcher", "Ram"
+                }
+                for _, p in ipairs(patterns) do
+                    if name:find(p) then
+                        inVehicle = true
+                        break
+                    end
+                end
+            end
+        end
+        
+        if inVehicle and not wasInVehicleLastFrame then
+            -- Transition: ENTERING vehicle
+            wasInVehicleLastFrame = true
+            if not vehicleSuspended then
+                vehicleSuspended = true
+                if TransmorpherCharacterState and TransmorpherCharacterState.MountDisplay then
+                    savedMountDisplayForVehicle = TransmorpherCharacterState.MountDisplay
+                    TRANSMORPHER_CMD = "MOUNT_RESET|SUSPEND"
+                    TransmorpherCharacterState.MountDisplay = nil
+                else
+                    TRANSMORPHER_CMD = "SUSPEND"
+                end
+            end
+        elseif not inVehicle and wasInVehicleLastFrame then
+            -- Transition: EXITING vehicle
+            wasInVehicleLastFrame = false
+            if vehicleSuspended then
+                vehicleSuspended = false
+                if savedMountDisplayForVehicle then
+                    TransmorpherCharacterState.MountDisplay = savedMountDisplayForVehicle
+                    TRANSMORPHER_CMD = "MOUNT_MORPH:" .. savedMountDisplayForVehicle .. "|RESUME"
+                    savedMountDisplayForVehicle = nil
+                    UpdateSpecialSlots()
+                else
+                    TRANSMORPHER_CMD = "RESUME"
+                end
             end
         end
     end)
@@ -6303,7 +6515,7 @@ do
         btn:SetPoint("TOPLEFT", CharacterModelFrame, "TOPLEFT", xOff, yOff)
         -- Save per-character
         if not TransmorpherCharacterState then
-            TransmorpherCharacterState = { Items = {}, Morph = nil, Scale = nil, MountDisplay = nil, PetDisplay = nil, HunterPetDisplay = nil }
+            TransmorpherCharacterState = { Items = {}, Morph = nil, Scale = nil, MountDisplay = nil, PetDisplay = nil, HunterPetDisplay = nil, EnchantMH = nil, EnchantOH = nil, WeaponSets = {} }
         end
         TransmorpherCharacterState.paperdollButtonPos = { x = xOff, y = yOff }
     end

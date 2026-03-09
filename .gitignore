@@ -1,6 +1,9 @@
 # Build files
 StealthMorpher/build/
 Transmorpher/build/
+*.dll
+*.exp
+*.lib
 
 # IDE files
 .vs/

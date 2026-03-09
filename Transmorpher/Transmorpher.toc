@@ -1,10 +1,10 @@
 ## Interface: 30300
 ## Author: VaultGate
 ## Title: Transmorpher
-## Notes: Client-side Transmog system for WotLK 3.3.5a. Requires dinput8.dll. v1.0.4: UI improvements, loadout system fixes, enchant icon updates.
+## Notes: Client-side Transmog system for WotLK 3.3.5a. Requires dinput8.dll. v1.1.0: Vehicle support and Smart Intervention expansion.
 ## SavedVariables: TransmorpherSavedLooks, TransmorpherMorphFavorites, TransmorpherSettings, TransmorpherLoadoutsAccount
 ## SavedVariablesPerCharacter: TransmorpherCharacterState
-## Version: 1.0.4
+## Version: 1.1.0
 
 db\ItemsDB.lua
 db\ItemsAPI.lua

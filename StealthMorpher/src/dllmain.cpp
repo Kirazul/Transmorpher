@@ -67,6 +67,12 @@ static auto wow_lua_settop = (lua_settop_fn)0x0084DBF0;
 
 #define LUA_GLOBALSINDEX (-10002)
 
+// SimplyMorpher3 addresses (verified working)
+static const uint32_t CLIENT_CONNECTION = 0x00CD87A8;  // SimplyMorpher3 uses this
+static const uint32_t OBJMGR_OFFSET = 0x34;            // +52 decimal
+static const uint32_t PLAYER_OFFSET = 0x24;            // +36 decimal  
+static const uint32_t DESC_OFFSET = 0x08;              // +8 decimal
+
 // Object Manager
 enum { TYPEMASK_PLAYER = 0x0010, TYPEMASK_UNIT = 0x0008 };
 static const uint32_t UNIT_FIELD_DISPLAYID        = 0x43 * 4;
@@ -102,6 +108,27 @@ struct WowObject {
     uint8_t  pad24[0x18];       // 0x24 .. 0x3B
     uint32_t nextObject;        // 0x3C — pointer to next object in linked list
 };
+
+// ================================================================
+// Helper: Read item GUID from inventory slot
+// ================================================================
+static uint64_t GetInventoryItemGuid(WowObject* player, int slot) {
+    if (!player || !player->descriptors) return 0;
+    __try {
+        // PLAYER_FIELD_INV_SLOT_HEAD starts at offset 0x4A (field index 0x4A * 4 bytes)
+        // Each inventory slot is 2 fields (8 bytes for GUID)
+        // Slot 0 = head, slot 15 = main hand (16-1), slot 16 = off-hand (17-1)
+        uint32_t baseField = 0x4A;  // PLAYER_FIELD_INV_SLOT_HEAD
+        uint32_t slotIndex = slot - 1;  // Convert 1-based to 0-based
+        uint32_t fieldOffset = (baseField + slotIndex * 2) * 4;
+        
+        uint8_t* desc = (uint8_t*)player->descriptors;
+        uint32_t guidLow = *(uint32_t*)(desc + fieldOffset);
+        uint32_t guidHigh = *(uint32_t*)(desc + fieldOffset + 4);
+        return ((uint64_t)guidHigh << 32) | guidLow;
+    } __except(EXCEPTION_EXECUTE_HANDLER) {}
+    return 0;
+}
 
 // Iterate ALL units in the object manager that were summoned/created by playerGuid.
 // For each match, call the callback.  Catches guardians (DK ghoul, Army of the Dead, etc.)
@@ -139,6 +166,29 @@ static auto GetObjectPtr = (GetObjectPtr_fn)0x004D4DB0;
 typedef void(__thiscall* UpdateDisplayInfo_fn)(void* thisPtr, uint32_t unk);
 static auto CGUnit_UpdateDisplayInfo = (UpdateDisplayInfo_fn)0x0073E410;
 
+// ================================================================
+// Get player object using SimplyMorpher3's exact method
+// ================================================================
+static WowObject* GetPlayerSimplyMorpher3() {
+    __try {
+        // SimplyMorpher3's exact pointer chain
+        uint32_t clientConn = *(uint32_t*)CLIENT_CONNECTION;
+        if (!clientConn) return nullptr;
+        
+        uint32_t objMgr = *(uint32_t*)(clientConn + OBJMGR_OFFSET);
+        if (!objMgr) return nullptr;
+        
+        uint32_t playerObj = *(uint32_t*)(objMgr + PLAYER_OFFSET);
+        if (!playerObj) return nullptr;
+        
+        WowObject* player = (WowObject*)playerObj;
+        if (player && player->descriptors) {
+            return player;
+        }
+    } __except(EXCEPTION_EXECUTE_HANDLER) {}
+    return nullptr;
+}
+
 static uint64_t GetPlayerGuid() {
     __try {
         uint32_t clientConnection = *(uint32_t*)0x00C79CE0;
@@ -153,6 +203,11 @@ static uint64_t GetPlayerGuid() {
 }
 
 static WowObject* GetPlayer() {
+    // Try SimplyMorpher3's method first (more reliable for morphing)
+    WowObject* player = GetPlayerSimplyMorpher3();
+    if (player) return player;
+    
+    // Fallback to original method
     __try {
         uint64_t guid = GetPlayerGuid();
         if (!guid) return nullptr;
@@ -232,6 +287,12 @@ static uint32_t g_morphEnchantMH = 0;  // desired enchant ID for main hand
 static uint32_t g_morphEnchantOH = 0;  // desired enchant ID for off-hand
 static uint32_t g_origEnchantMH = 0;   // original enchant ID before morph
 static uint32_t g_origEnchantOH = 0;   // original enchant ID before morph
+
+// Track equipped weapons to detect swaps
+// We need to track the actual item GUID, not just display ID
+// because enchant-only morphs don't change the display ID
+static uint64_t g_lastWeaponMHGuid = 0;
+static uint64_t g_lastWeaponOHGuid = 0;
 
 // Suspension: true when addon signals a model-changing form is active
 static bool g_suspended = false;
@@ -361,6 +422,76 @@ static void ReStampWeapons(WowObject* player) {
 }
 
 // ================================================================
+// Pattern scanning for dynamic offset resolution
+// ================================================================
+static bool PatternScan(DWORD start, DWORD size, const char* pattern, const char* mask, DWORD* result) {
+    DWORD patternLen = (DWORD)strlen(mask);
+    
+    __try {
+        for (DWORD i = 0; i < size - patternLen; i++) {
+            bool found = true;
+            for (DWORD j = 0; j < patternLen; j++) {
+                if (mask[j] == 'x' && pattern[j] != *(char*)(start + i + j)) {
+                    found = false;
+                    break;
+                }
+            }
+            if (found) {
+                *result = start + i;
+                return true;
+            }
+        }
+    } __except(EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+    return false;
+}
+
+// Find the descriptor write instruction: mov [eax+edx*4], ecx
+// Pattern: 89 0C 90 (mov [eax+edx*4], ecx) followed by 5D (pop ebp) and C2 08 00 (ret 8)
+static DWORD FindDescriptorWriteHook(DWORD base) {
+    // Search in .text section (typical range for code)
+    DWORD searchStart = base + 0x1000;
+    DWORD searchSize = 0x500000; // Search first ~5MB of code
+    
+    // Pattern: mov [eax+edx*4], ecx; pop ebp; ret 8
+    const char pattern[] = "\x89\x0C\x90\x5D\xC2\x08\x00";
+    const char mask[] = "xxxxxxx";
+    
+    DWORD addr = 0;
+    DWORD currentPos = searchStart;
+    
+    // We might find multiple matches, look for the one in a function that
+    // has the right context (descriptor write function)
+    while (currentPos < searchStart + searchSize) {
+        if (PatternScan(currentPos, searchStart + searchSize - currentPos, pattern, mask, &addr)) {
+            // Verify this is in a valid function by checking for prologue nearby
+            __try {
+                bool validFunc = false;
+                for (DWORD a = addr - 1; a > addr - 256 && a > base; a--) {
+                    // Look for: push ebp; mov ebp, esp (55 8B EC)
+                    if (*(BYTE*)a == 0x55 && *(BYTE*)(a+1) == 0x8B && *(BYTE*)(a+2) == 0xEC) {
+                        validFunc = true;
+                        break;
+                    }
+                }
+                if (validFunc) {
+                    Log("Found descriptor write pattern at 0x%08X", addr);
+                    return addr;
+                }
+            } __except(EXCEPTION_EXECUTE_HANDLER) {}
+            
+            // Continue searching after this match
+            currentPos = addr + 1;
+        } else {
+            break;
+        }
+    }
+    
+    return 0;
+}
+
+// ================================================================
 // Mount Morph Hook — intercepts the game's descriptor write instruction
 // ================================================================
 // Hooks at Wow.exe base+0x343BAC: the `mov [eax+edx*4], ecx`
@@ -397,17 +528,27 @@ void __declspec(naked) MountDisplayHook()
         cmp byte ptr [g_hookBypass], 1
         je do_original
 
+        // Safety: If morph is suspended, skip substitution
+        cmp byte ptr [g_suspended], 1
+        je do_original
+
         // Is this writing to UNIT_FIELD_MOUNTDISPLAYID (index 0x45)?
         cmp edx, 0x45
         jne do_original
 
-        // Is this a dismount event (writing 0)?  Let it through unchanged.
+        // Is this a dismount (writing 0)?
         cmp ecx, 0
         je do_original
 
         // Is this the local player's descriptor array?
         cmp eax, dword ptr [g_playerDescBase]
         jne do_original
+
+        // --- SMART INTERVENTION: POINTER PROTECTION ---
+        // Display IDs in 3.3.5a are always < 100,000.
+        // Vehicle Seat and Transport pointers are always > 0x01000000.
+        cmp ecx, 0x00FFFFFF
+        ja do_original
 
         // Save the real mount displayID the game intended to write
         mov dword ptr [g_origMount], ecx
@@ -428,26 +569,90 @@ void __declspec(naked) MountDisplayHook()
 
 static bool InstallMountHook()
 {
+    // Try multiple methods to get the WoW executable base address
     DWORD base = (DWORD)GetModuleHandleA("Wow.exe");
-    if (!base) return false;
+    if (!base) {
+        base = (DWORD)GetModuleHandleA("WoW.exe");  // Try with capital W
+    }
+    if (!base) {
+        base = (DWORD)GetModuleHandleA(NULL);  // Get main executable (whatever it's called)
+    }
+    if (!base) {
+        Log("ERROR: Could not get WoW executable module handle");
+        return false;
+    }
+    
+    Log("WoW executable base address: 0x%08X", base);
 
+    // Try hardcoded offset first (fastest for standard 3.3.5a 12340)
     g_hookAddr = base + 0x343BAC;
+    bool useHardcoded = false;
+    
+    // Verify the hardcoded offset has the expected pattern
+    __try {
+        if (*(BYTE*)g_hookAddr == 0x89 && 
+            *(BYTE*)(g_hookAddr+1) == 0x0C && 
+            *(BYTE*)(g_hookAddr+2) == 0x90) {
+            useHardcoded = true;
+            Log("Using hardcoded offset 0x343BAC (pattern verified)");
+        }
+    } __except(EXCEPTION_EXECUTE_HANDLER) {}
+    
+    // If hardcoded offset doesn't match, scan for the pattern
+    if (!useHardcoded) {
+        Log("Hardcoded offset invalid, scanning for descriptor write pattern...");
+        DWORD foundAddr = FindDescriptorWriteHook(base);
+        if (foundAddr == 0) {
+            Log("ERROR: Could not find descriptor write instruction pattern");
+            Log("This may be an unsupported WoW client version");
+            return false;
+        }
+        g_hookAddr = foundAddr;
+        Log("Found descriptor write hook at 0x%08X (offset 0x%X)", g_hookAddr, g_hookAddr - base);
+    }
+
     const int LEN = 6;
 
+    // Verify the hook address is readable before attempting to hook
+    __try {
+        BYTE testRead = *(BYTE*)g_hookAddr;
+        (void)testRead; // Suppress unused variable warning
+    } __except(EXCEPTION_EXECUTE_HANDLER) {
+        Log("ERROR: Hook address 0x%08X is not readable", g_hookAddr);
+        return false;
+    }
+
     // Save original bytes so we can unhook cleanly
-    memcpy(g_hookOrigBytes, (void*)g_hookAddr, LEN);
+    __try {
+        memcpy(g_hookOrigBytes, (void*)g_hookAddr, LEN);
+    } __except(EXCEPTION_EXECUTE_HANDLER) {
+        Log("ERROR: Failed to read original bytes at 0x%08X", g_hookAddr);
+        return false;
+    }
 
     DWORD oldProt;
-    if (!VirtualProtect((void*)g_hookAddr, LEN, PAGE_EXECUTE_READWRITE, &oldProt))
+    if (!VirtualProtect((void*)g_hookAddr, LEN, PAGE_EXECUTE_READWRITE, &oldProt)) {
+        DWORD err = GetLastError();
+        Log("ERROR: VirtualProtect failed at 0x%08X (error code: %u)", g_hookAddr, err);
         return false;
+    }
 
-    // NOP the region, then write JMP rel32
-    memset((void*)g_hookAddr, 0x90, LEN);
-    *(BYTE*)g_hookAddr = 0xE9;
-    *(DWORD*)(g_hookAddr + 1) = (DWORD)&MountDisplayHook - g_hookAddr - 5;
+    __try {
+        // NOP the region, then write JMP rel32
+        memset((void*)g_hookAddr, 0x90, LEN);
+        *(BYTE*)g_hookAddr = 0xE9;
+        *(DWORD*)(g_hookAddr + 1) = (DWORD)&MountDisplayHook - g_hookAddr - 5;
+    } __except(EXCEPTION_EXECUTE_HANDLER) {
+        Log("ERROR: Exception while writing hook at 0x%08X", g_hookAddr);
+        VirtualProtect((void*)g_hookAddr, LEN, oldProt, &oldProt);
+        return false;
+    }
 
     DWORD tmp;
-    VirtualProtect((void*)g_hookAddr, LEN, oldProt, &tmp);
+    if (!VirtualProtect((void*)g_hookAddr, LEN, oldProt, &tmp)) {
+        Log("WARNING: Failed to restore memory protection at 0x%08X", g_hookAddr);
+        // Not fatal - hook is still installed
+    }
 
     g_hookInstalled = true;
     Log("Mount hook installed at 0x%08X", g_hookAddr);
@@ -456,13 +661,16 @@ static bool InstallMountHook()
     // Scan backward for the prologue: push ebp (0x55) / mov ebp, esp (0x8B EC)
     g_setDescValueFunc = 0;
     __try {
-        for (DWORD a = g_hookAddr - 1; a > g_hookAddr - 128; a--) {
+        for (DWORD a = g_hookAddr - 1; a > g_hookAddr - 256; a--) {
             if (*(BYTE*)a == 0x55 && *(BYTE*)(a+1) == 0x8B && *(BYTE*)(a+2) == 0xEC) {
                 g_setDescValueFunc = a;
                 break;
             }
         }
-    } __except(EXCEPTION_EXECUTE_HANDLER) {}
+    } __except(EXCEPTION_EXECUTE_HANDLER) {
+        Log("WARNING: Exception while scanning for function prologue");
+    }
+    
     if (g_setDescValueFunc) {
         Log("Descriptor write function found at 0x%08X", g_setDescValueFunc);
     } else {
@@ -486,6 +694,51 @@ static void UninstallMountHook()
 }
 
 // ================================================================
+// Helper: Check if a display ID is a race character model
+// Using verified working display IDs
+// ================================================================
+static bool IsRaceDisplayID(uint32_t displayId) {
+    // Verified working race display IDs
+    // Night Elf Female: 2222
+    if (displayId == 2222) return true;
+    // Troll Female: 4358
+    if (displayId == 4358) return true;
+    // Orc Male: 6785
+    if (displayId == 6785) return true;
+    // Dwarf Female: 13250
+    if (displayId == 13250) return true;
+    // Draenei Male: 17155
+    if (displayId == 17155) return true;
+    // Human: 19723-19724
+    if (displayId >= 19723 && displayId <= 19724) return true;
+    // Orc Female, Dwarf Male, Night Elf Male: 20316-20318
+    if (displayId >= 20316 && displayId <= 20318) return true;
+    // Troll Male: 20321
+    if (displayId == 20321) return true;
+    // Draenei Female: 20323
+    if (displayId == 20323) return true;
+    // Blood Elf: 20578-20579
+    if (displayId >= 20578 && displayId <= 20579) return true;
+    // Gnome: 20580-20581
+    if (displayId >= 20580 && displayId <= 20581) return true;
+    // Tauren: 20584-20585
+    if (displayId >= 20584 && displayId <= 20585) return true;
+    // Undead Female: 23112
+    if (displayId == 23112) return true;
+    // Undead Male: 28193
+    if (displayId == 28193) return true;
+    
+    // Legacy naked base models (keep for compatibility)
+    if (displayId >= 49 && displayId <= 60) return true;
+    if (displayId >= 1563 && displayId <= 1564) return true;
+    if (displayId >= 1478 && displayId <= 1479) return true;
+    if (displayId >= 15475 && displayId <= 15476) return true;
+    if (displayId >= 16125 && displayId <= 16126) return true;
+    
+    return false;
+}
+
+// ================================================================
 // Apply all active morphs to descriptors
 // Returns true if any descriptor was actually changed
 // ================================================================
@@ -497,7 +750,29 @@ static bool ApplyMorphState(WowObject* player) {
     if (g_morphDisplay > 0) {
         uint32_t current = *(uint32_t*)(desc + UNIT_FIELD_DISPLAYID);
         if (current != g_morphDisplay) {
-            *(uint32_t*)(desc + UNIT_FIELD_DISPLAYID) = g_morphDisplay;
+            // Use SimplyMorpher3's double-update technique for race morphs
+            if (IsRaceDisplayID(g_morphDisplay)) {
+                // Step 1: Dummy display ID
+                *(uint32_t*)(desc + UNIT_FIELD_DISPLAYID) = 621;
+                // Step 2: Actual display ID
+                *(uint32_t*)(desc + UNIT_FIELD_DISPLAYID) = g_morphDisplay;
+                
+                // Refresh equipment slots
+                for (int s = 1; s <= 19; s++) {
+                    if (g_morphItems[s] == 0) {
+                        uint32_t off = GetVisibleItemField(s);
+                        if (off) {
+                            uint32_t currentItem = *(uint32_t*)(desc + off);
+                            if (currentItem > 0) {
+                                *(uint32_t*)(desc + off) = currentItem;
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Non-race morph: simple write
+                *(uint32_t*)(desc + UNIT_FIELD_DISPLAYID) = g_morphDisplay;
+            }
             changed = true;
         }
     }
@@ -544,10 +819,48 @@ static bool DoMorph(const char* cmd, WowObject* player) {
     if (strncmp(cmd, "MORPH:", 6) == 0) {
         uint32_t id = (uint32_t)atoi(cmd + 6);
         if (id > 0) {
+            // RACE MORPH FIX: SimplyMorpher3's exact technique
+            // Key insight: UpdateDisplayInfo must be called TWICE with specific setup
+            
+            // Step 1: Write dummy display ID (621) and call UpdateDisplayInfo
+            *(uint32_t*)(desc + UNIT_FIELD_DISPLAYID) = 621;
+            __try {
+                // Call with parameter 0 (SimplyMorpher3 pushes 0)
+                CGUnit_UpdateDisplayInfo(player, 0);
+            } __except(EXCEPTION_EXECUTE_HANDLER) {
+                Log("UpdateDisplayInfo exception (dummy)");
+            }
+            
+            // Step 2: Write actual display ID and call UpdateDisplayInfo again
             *(uint32_t*)(desc + UNIT_FIELD_DISPLAYID) = id;
             g_morphDisplay = id;
-            update = true;
-            Log("Morphed displayId=%u", id);
+            
+            __try {
+                // Call with parameter 0 again (SimplyMorpher3 pushes 0 both times)
+                CGUnit_UpdateDisplayInfo(player, 0);
+            } __except(EXCEPTION_EXECUTE_HANDLER) {
+                Log("UpdateDisplayInfo exception (actual)");
+            }
+            
+            // For race morphs, also refresh equipment slots
+            if (IsRaceDisplayID(id)) {
+                for (int s = 1; s <= 19; s++) {
+                    if (g_morphItems[s] == 0) {
+                        uint32_t off = GetVisibleItemField(s);
+                        if (off) {
+                            uint32_t currentItem = *(uint32_t*)(desc + off);
+                            if (currentItem > 0) {
+                                *(uint32_t*)(desc + off) = currentItem;
+                            }
+                        }
+                    }
+                }
+                Log("Race morph applied displayId=%u (SimplyMorpher3 technique)", id);
+            } else {
+                Log("Morphed displayId=%u (SimplyMorpher3 technique)", id);
+            }
+            
+            update = false; // We already called UpdateDisplayInfo, don't call it again
         } else if (id == 0) {
             // MORPH:0 = reset character morph only (preserve item morphs)
             // Restore native display ID
@@ -706,7 +1019,8 @@ static bool DoMorph(const char* cmd, WowObject* player) {
     }
     else if (strncmp(cmd, "ENCHANT_MH:", 11) == 0) {
         uint32_t enchantId = (uint32_t)atoi(cmd + 11);
-        if (g_origEnchantMH == 0) {
+        // Always save the current enchant as original before morphing (unless we already have one)
+        if (g_morphEnchantMH == 0 && g_origEnchantMH == 0) {
             g_origEnchantMH = ReadVisibleEnchant(player, 16);
         }
         g_morphEnchantMH = enchantId;
@@ -716,7 +1030,8 @@ static bool DoMorph(const char* cmd, WowObject* player) {
     }
     else if (strncmp(cmd, "ENCHANT_OH:", 11) == 0) {
         uint32_t enchantId = (uint32_t)atoi(cmd + 11);
-        if (g_origEnchantOH == 0) {
+        // Always save the current enchant as original before morphing (unless we already have one)
+        if (g_morphEnchantOH == 0 && g_origEnchantOH == 0) {
             g_origEnchantOH = ReadVisibleEnchant(player, 17);
         }
         g_morphEnchantOH = enchantId;
@@ -725,24 +1040,42 @@ static bool DoMorph(const char* cmd, WowObject* player) {
         Log("Enchant OH set id=%u (orig=%u)", enchantId, g_origEnchantOH);
     }
     else if (strncmp(cmd, "ENCHANT_RESET_MH", 16) == 0) {
+        // Read current real enchant before resetting (in case weapon was swapped)
+        uint32_t currentRealEnchant = ReadVisibleEnchant(player, 16);
+        
         if (g_morphEnchantMH > 0) {
-            WriteVisibleEnchant(player, 16, g_origEnchantMH);
+            // If we have a saved original, restore it
+            if (g_origEnchantMH > 0) {
+                WriteVisibleEnchant(player, 16, g_origEnchantMH);
+            } else {
+                // No saved original, use current real enchant
+                WriteVisibleEnchant(player, 16, currentRealEnchant);
+            }
         }
         g_morphEnchantMH = 0;
         g_origEnchantMH = 0;
         g_weaponRefreshTicks = 5;
         update = true;
-        Log("Enchant MH morph reset");
+        Log("Enchant MH morph reset (restored to %u)", currentRealEnchant);
     }
     else if (strncmp(cmd, "ENCHANT_RESET_OH", 16) == 0) {
+        // Read current real enchant before resetting (in case weapon was swapped)
+        uint32_t currentRealEnchant = ReadVisibleEnchant(player, 17);
+        
         if (g_morphEnchantOH > 0) {
-            WriteVisibleEnchant(player, 17, g_origEnchantOH);
+            // If we have a saved original, restore it
+            if (g_origEnchantOH > 0) {
+                WriteVisibleEnchant(player, 17, g_origEnchantOH);
+            } else {
+                // No saved original, use current real enchant
+                WriteVisibleEnchant(player, 17, currentRealEnchant);
+            }
         }
         g_morphEnchantOH = 0;
         g_origEnchantOH = 0;
         g_weaponRefreshTicks = 5;
         update = true;
-        Log("Enchant OH morph reset");
+        Log("Enchant OH morph reset (restored to %u)", currentRealEnchant);
     }
     else if (strncmp(cmd, "ENCHANT_RESET", 13) == 0) {
         // Restore original enchant visuals
@@ -1059,12 +1392,11 @@ static void MorphGuard(WowObject* player) {
     }
 
     // --- Enchant morph guard ---
-    // Re-apply visible enchant overrides if the game has reset them
+    // Simple guard: just reapply if game reset the enchant
     if (g_morphEnchantMH > 0) {
         __try {
             uint32_t curEnchant = ReadVisibleEnchant(player, 16);
             if (curEnchant != g_morphEnchantMH) {
-                if (g_origEnchantMH == 0 && curEnchant > 0) g_origEnchantMH = curEnchant;
                 WriteVisibleEnchant(player, 16, g_morphEnchantMH);
             }
         } __except(EXCEPTION_EXECUTE_HANDLER) {}
@@ -1073,7 +1405,6 @@ static void MorphGuard(WowObject* player) {
         __try {
             uint32_t curEnchant = ReadVisibleEnchant(player, 17);
             if (curEnchant != g_morphEnchantOH) {
-                if (g_origEnchantOH == 0 && curEnchant > 0) g_origEnchantOH = curEnchant;
                 WriteVisibleEnchant(player, 17, g_morphEnchantOH);
             }
         } __except(EXCEPTION_EXECUTE_HANDLER) {}
@@ -1120,6 +1451,8 @@ static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWOR
                     g_origHPetDisplay = 0;
                     g_origEnchantMH = 0;
                     g_origEnchantOH = 0;
+                    g_lastWeaponMHGuid = 0;
+                    g_lastWeaponOHGuid = 0;
                     g_origMount = 0;
                     g_origDisplay = 0;
                     g_origScale = 1.0f;
@@ -1136,7 +1469,7 @@ static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWOR
 
         // Keep the hook's player descriptor pointer up to date
         if (player && player->descriptors)
-            g_playerDescBase = (DWORD)player->descriptors;
+            g_playerDescBase = (DWORD)(uintptr_t)player->descriptors;
 
         // --- Phase 1: Process addon commands from Lua global ---
         void* L = GetLuaState();
@@ -1230,6 +1563,8 @@ static DWORD WINAPI StealthThread(LPVOID lpParam) {
         Log("Mount display hook installed successfully");
     } else {
         Log("WARNING: Failed to install mount display hook!");
+        Log("NOTE: All other features (character/item/pet/enchant morphs) will still work normally.");
+        Log("Only mount morphing will be unavailable. This may happen on some systems due to memory protection.");
     }
 
     // Install a timer on WoW's main thread — fires every 20ms
