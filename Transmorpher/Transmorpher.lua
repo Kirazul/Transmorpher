@@ -1585,10 +1585,12 @@ local function slot_OnLeftClick(self)
     end
     mainFrame.selectedSlot = self
     mainFrame.tabs.preview.subclassMenu:Update(self.slotName)
+    -- Explicitly switch to Preview tab using tab_OnClick
+    if mainFrame.buttons["tab1"] then
+        tab_OnClick(mainFrame.buttons["tab1"])
+    end
     -- Switch to Preview tab and show the item
     if self.itemId ~= nil then
-        -- Explicitly switch to Preview tab using tab_OnClick
-        tab_OnClick(mainFrame.buttons["tab1"])
         -- Try to find the item in the DB and update preview
         local found = false
         for subclass, items in pairs(ns.items[self.slotName] or {}) do
@@ -6464,24 +6466,38 @@ do
 
     local titleSearch = CreateFrame("EditBox", "$parentTitleSearch", scrollChild, "InputBoxTemplate")
     titleSearch:SetPoint("TOPLEFT", 25, yOffset)
-    titleSearch:SetSize(200, 20)
+    titleSearch:SetSize(180, 20)
     titleSearch:SetAutoFocus(false)
-    titleSearch:SetTextInsets(0, 0, 0, 0)
+    titleSearch:SetTextInsets(6, 6, 0, 0)
     titleSearch:SetFontObject("ChatFontNormal")
+    titleSearch:SetFrameStrata("DIALOG")
+    titleSearch:SetFrameLevel(scrollChild:GetFrameLevel() + 20)
     
     local searchLabel = titleSearch:CreateFontString(nil, "ARTWORK", "GameFontDisable")
-    searchLabel:SetPoint("LEFT", 0, 0)
+    searchLabel:SetPoint("LEFT", 6, 0)
     searchLabel:SetText("Search Titles...")
     
     titleSearch:SetScript("OnEditFocusGained", function(self) searchLabel:Hide() end)
     titleSearch:SetScript("OnEditFocusLost", function(self) 
         if self:GetText() == "" then searchLabel:Show() end 
     end)
+    titleSearch:SetScript("OnEscapePressed", function(self)
+        self:ClearFocus()
+    end)
+
+    local btnClearSearch = CreateGoldenButton("$parentClearTitleSearch", scrollChild)
+    btnClearSearch:SetPoint("LEFT", titleSearch, "RIGHT", 8, 0)
+    btnClearSearch:SetSize(80, 22)
+    btnClearSearch:SetText("Clear")
+    btnClearSearch:SetFrameStrata("DIALOG")
+    btnClearSearch:SetFrameLevel(scrollChild:GetFrameLevel() + 20)
     
     -- Title List Scroll Frame
     local listFrame = CreateFrame("ScrollFrame", "$parentTitleList", scrollChild, "UIPanelScrollFrameTemplate")
     listFrame:SetPoint("TOPLEFT", 20, yOffset - 30)
-    listFrame:SetSize(280, 150)
+    listFrame:SetSize(280, 170)
+    listFrame:SetFrameStrata("DIALOG")
+    listFrame:SetFrameLevel(scrollChild:GetFrameLevel() + 10)
     
     local listContent = CreateFrame("Frame", nil, listFrame)
     listContent:SetSize(280, 1)
@@ -6500,8 +6516,17 @@ do
     listBg:SetBackdropColor(0, 0, 0, 0.5)
     listBg:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
     listBg:SetFrameLevel(listFrame:GetFrameLevel() - 1)
+    listBg:EnableMouse(false)
     
     local titleButtons = {}
+    local function SanitizeTitleName(rawName)
+        local name = (rawName or ""):gsub("%%s", ""):gsub("^%s+", ""):gsub("%s+$", "")
+        if name == "" then
+            name = rawName or ""
+        end
+        return name
+    end
+
     local function UpdateTitleList(filter)
         -- Hide all buttons
         for _, btn in pairs(titleButtons) do btn:Hide() end
@@ -6509,13 +6534,13 @@ do
         if not Transmorpher_Titles then return end
         
         local index = 0
-        local btnHeight = 20
+        local btnHeight = 22
+        local needle = (filter or ""):lower()
         
         for _, titleData in ipairs(Transmorpher_Titles) do
-            local name = titleData.name:gsub("%%s", ""):gsub("^%s+", ""):gsub("%s+$", "")
-            if name == "" then name = titleData.name end -- Fallback
+            local name = SanitizeTitleName(titleData.name)
             
-            if not filter or filter == "" or name:lower():find(filter:lower(), 1, true) then
+            if needle == "" or name:lower():find(needle, 1, true) then
                 index = index + 1
                 
                 local btn = titleButtons[index]
@@ -6523,6 +6548,8 @@ do
                     btn = CreateFrame("Button", nil, listContent)
                     btn:SetSize(260, btnHeight)
                     btn:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+                    btn:SetFrameStrata("DIALOG")
+                    btn:RegisterForClicks("LeftButtonUp")
                     
                     local text = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightLeft")
                     text:SetPoint("LEFT", 5, 0)
@@ -6555,14 +6582,24 @@ do
     titleSearch:SetScript("OnTextChanged", function(self)
         UpdateTitleList(self:GetText())
     end)
+
+    btnClearSearch:SetScript("OnClick", function()
+        titleSearch:SetText("")
+        titleSearch:ClearFocus()
+        searchLabel:Show()
+        UpdateTitleList("")
+        PlaySound("gsTitleOptionOK")
+    end)
     
     -- Initial population
     UpdateTitleList("")
     
     local btnResetTitle = CreateGoldenButton("$parentResetTitle", scrollChild)
-    btnResetTitle:SetPoint("TOPLEFT", listFrame, "BOTTOMLEFT", 0, -10)
+    btnResetTitle:SetPoint("TOPLEFT", listFrame, "BOTTOMLEFT", 0, -12)
     btnResetTitle:SetSize(140, 24)
     btnResetTitle:SetText("Reset Title")
+    btnResetTitle:SetFrameStrata("DIALOG")
+    btnResetTitle:SetFrameLevel(scrollChild:GetFrameLevel() + 20)
     
     btnResetTitle:SetScript("OnClick", function()
         if IsMorpherReady() then
