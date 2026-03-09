@@ -1,6 +1,6 @@
 local addon, ns = ...
 
-local mainFrameTitle = "|cffF5C842Transmorpher|r  |cff6a6050v1.1.0|r"
+local mainFrameTitle = "|cffF5C842Transmorpher|r  |cff6a6050v1.1.1|r"
 
 -- ============================================================
 -- CUSTOM GOLDEN BUTTON STYLE
@@ -161,6 +161,7 @@ local defaultSettings = {
     saveCombatPetMorph = true,
     showDBWProc = true,
     morphInShapeshift = false,
+    worldTime = nil, -- nil or -1 = disabled, 0.0-1.0 = enabled
 }
 
 local function GetSettings()
@@ -269,7 +270,7 @@ end
 -- ============================================================
 local function TrackMorphCommand(cmd)
     if not GetSettings().saveMorphState then return end
-    if not TransmorpherCharacterState then TransmorpherCharacterState = {Items={}, Morph=nil, Scale=nil, MountDisplay=nil, PetDisplay=nil, HunterPetDisplay=nil, HunterPetScale=nil, EnchantMH=nil, EnchantOH=nil} end
+    if not TransmorpherCharacterState then TransmorpherCharacterState = {Items={}, Morph=nil, Scale=nil, MountDisplay=nil, PetDisplay=nil, HunterPetDisplay=nil, HunterPetScale=nil, EnchantMH=nil, EnchantOH=nil, TitleID=nil} end
     if not TransmorpherCharacterState.Items then TransmorpherCharacterState.Items = {} end
 
     for singleCmd in cmd:gmatch("[^|]+") do
@@ -330,9 +331,16 @@ local function TrackMorphCommand(cmd)
         elseif prefix == "ENCHANT_RESET" then
             TransmorpherCharacterState.EnchantMH = nil
             TransmorpherCharacterState.EnchantOH = nil
+        elseif prefix == "TITLE" and parts[2] then
+            local val = tonumber(parts[2])
+            if val and val > 0 then
+                TransmorpherCharacterState.TitleID = val
+            end
+        elseif prefix == "TITLE_RESET" then
+            TransmorpherCharacterState.TitleID = nil
         elseif prefix == "RESET" and parts[2] then
             if parts[2] == "ALL" then
-                TransmorpherCharacterState = {Items={}, Morph=nil, Scale=nil, MountDisplay=nil, PetDisplay=nil, HunterPetDisplay=nil, HunterPetScale=nil, EnchantMH=nil, EnchantOH=nil, WeaponSets={}}
+                TransmorpherCharacterState = {Items={}, Morph=nil, Scale=nil, MountDisplay=nil, PetDisplay=nil, HunterPetDisplay=nil, HunterPetScale=nil, EnchantMH=nil, EnchantOH=nil, TitleID=nil, WeaponSets={}}
             else
                 local slotId = tonumber(parts[2])
                 TransmorpherCharacterState.Items[slotId] = nil
@@ -502,7 +510,7 @@ local function UpdateSpecialSlots()
         local combatPetSlot = mainFrame.specialSlots.CombatPet
         if TransmorpherCharacterState and TransmorpherCharacterState.HunterPetDisplay then
             local combatPetEntry = nil
-            for _, entry in ipairs(ns.combatPetsDB) do
+            for _, entry in ipairs(ns.combatPetsDB or {}) do
                 if entry[3] == TransmorpherCharacterState.HunterPetDisplay then
                     combatPetEntry = entry
                     break
@@ -627,6 +635,9 @@ local function SendFullMorphState()
     end
     if TransmorpherCharacterState.EnchantOH then
         table.insert(cmdQueue, "ENCHANT_OH:"..TransmorpherCharacterState.EnchantOH)
+    end
+    if TransmorpherCharacterState.TitleID then
+        table.insert(cmdQueue, "TITLE:"..TransmorpherCharacterState.TitleID)
     end
     if TransmorpherCharacterState.Items then
         for slot, item in pairs(TransmorpherCharacterState.Items) do
@@ -798,7 +809,7 @@ mainFrame = CreateFrame("Frame", addon, UIParent)
 table.insert(UISpecialFrames, mainFrame:GetName())
 do
     mainFrame:SetWidth(1045)
-    mainFrame:SetHeight(505)
+    mainFrame:SetHeight(528)
     mainFrame:SetPoint("CENTER")
     mainFrame:Hide()
     mainFrame:SetMovable(true)
@@ -1214,6 +1225,9 @@ do
         for _, slotName in pairs(slotOrder) do
             local slot = mainFrame.slots[slotName]
             if slot.itemId ~= nil and slotToEquipSlotId[slotName] then
+                if slot.isHiddenSlot then
+                    ShowMorphGlow(slot)
+                else
                 local equippedId = GetEquippedItemForSlot(slotName)
                 if equippedId and equippedId == slot.itemId then
                     -- Same as equipped: not a morph
@@ -1225,6 +1239,7 @@ do
                     slot.isMorphed = true
                     slot.morphedItemId = slot.itemId
                     ShowMorphGlow(slot)
+                end
                 end
             end
         end
@@ -1401,7 +1416,7 @@ end
 
 ---------------- TABS ----------------
 
-local TAB_NAMES = {"Preview", "Loadouts", "Mounts", "Pets", "Combat Pets", "Morph", "Settings"}
+local TAB_NAMES = {"Preview", "Loadouts", "Mounts", "Pets", "Combat Pets", "Morph", "Misc", "Settings"}
 mainFrame.tabs = {}
 
 do
@@ -1526,7 +1541,8 @@ do
     mainFrame.tabs.pets = tabs[4]
     mainFrame.tabs.combatPets = tabs[5]
     mainFrame.tabs.morph = tabs[6]
-    mainFrame.tabs.settings = tabs[7]
+    mainFrame.tabs.env = tabs[7]
+    mainFrame.tabs.settings = tabs[8]
 end
 
 ---------------- SLOTS ----------------
@@ -1564,8 +1580,8 @@ local function slot_OnLeftClick(self)
         for _, es in pairs(mainFrame.enchantSlots) do es:UnlockHighlight() end
     end
     -- Exit enchant browsing mode if active
-    if mainFrame.tabs.preview.enchantMode then
-        mainFrame.tabs.preview:ExitEnchantMode()
+    if mainFrame.tabs.preview.itemsSubTab.enchantMode then
+        mainFrame.tabs.preview.itemsSubTab:ExitEnchantMode()
     end
     mainFrame.selectedSlot = self
     mainFrame.tabs.preview.subclassMenu:Update(self.slotName)
@@ -1580,8 +1596,8 @@ local function slot_OnLeftClick(self)
                 local itemId = entry[1][1]
                 if itemId == self.itemId then
                     mainFrame.tabs.preview.subclassMenu:Update(self.slotName)
-                    mainFrame.tabs.preview.dropText:SetText(subclass)
-                    mainFrame.tabs.preview:Update(self.slotName, subclass)
+                    mainFrame.tabs.preview.itemsSubTab.dropText:SetText(subclass)
+                    mainFrame.tabs.preview.itemsSubTab:Update(self.slotName, subclass)
                     found = true
                     break
                 end
@@ -2155,7 +2171,7 @@ do
                 -- Switch to Items Preview tab and enter enchant mode
                 tab_OnClick(mainFrame.buttons["tab1"])
                 if mainFrame.tabs.preview:IsShown() then
-                    mainFrame.tabs.preview:UpdateEnchantMode(eName)
+                    mainFrame.tabs.preview.itemsSubTab:UpdateEnchantMode(eName)
                 end
                 PlaySound("gsTitleOptionOK")
             elseif button == "RightButton" then
@@ -2268,11 +2284,118 @@ end)
 
 ---------------- PREVIEW TAB ----------------
 
-mainFrame.tabs.preview.list = ns.CreatePreviewList(mainFrame.tabs.preview)
-mainFrame.tabs.preview.slider = CreateFrame("Slider", "$parentSlider", mainFrame.tabs.preview, "UIPanelScrollBarTemplateLightBorder")
+-- Create Sub-Tabs
+local itemsSubTab = CreateFrame("Frame", "$parentItemsSubTab", mainFrame.tabs.preview)
+itemsSubTab:SetPoint("TOPLEFT", 0, -50)
+itemsSubTab:SetPoint("BOTTOMRIGHT")
+mainFrame.tabs.preview.itemsSubTab = itemsSubTab
+
+local setsSubTab = CreateFrame("Frame", "$parentSetsSubTab", mainFrame.tabs.preview)
+setsSubTab:SetPoint("TOPLEFT", 0, -50)
+setsSubTab:SetPoint("BOTTOMRIGHT")
+setsSubTab:Hide()
+mainFrame.tabs.preview.setsSubTab = setsSubTab
+
+local previewSubTabBar = CreateFrame("Frame", nil, mainFrame.tabs.preview)
+previewSubTabBar:SetSize(220, 30)
+previewSubTabBar:SetPoint("TOPLEFT", 0, -20)
+
+local function CreateSubTabButton(parent, id, text)
+    local btn = CreateFrame("Button", nil, parent)
+    btn:SetID(id)
+    btn:SetSize(110, 30)
+
+    local bg = btn:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetTexture(1, 1, 1, 0.0)
+    btn.bg = bg
+
+    local line = btn:CreateTexture(nil, "OVERLAY")
+    line:SetHeight(2)
+    line:SetPoint("BOTTOMLEFT", 15, 0)
+    line:SetPoint("BOTTOMRIGHT", -15, 0)
+    line:SetTexture(1, 0.82, 0)
+    line:Hide()
+    btn.line = line
+
+    local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    fs:SetPoint("CENTER", 0, 0)
+    fs:SetText(text)
+    fs:SetTextColor(0.5, 0.5, 0.5)
+    btn.fs = fs
+
+    btn.SetActive = function(self, active)
+        self.isActive = active
+        if active then
+            self.line:Show()
+            self.fs:SetTextColor(1, 1, 1)
+            self.bg:SetTexture(1, 1, 1, 0.05)
+        else
+            self.line:Hide()
+            self.fs:SetTextColor(0.5, 0.5, 0.5)
+            self.bg:SetTexture(0, 0, 0, 0)
+        end
+    end
+
+    btn:SetScript("OnEnter", function(self)
+        if not self.isActive then
+            self.fs:SetTextColor(0.9, 0.9, 0.9)
+            self.bg:SetTexture(1, 1, 1, 0.03)
+        end
+    end)
+
+    btn:SetScript("OnLeave", function(self)
+        if not self.isActive then
+            self.fs:SetTextColor(0.5, 0.5, 0.5)
+            self.bg:SetTexture(0, 0, 0, 0)
+        end
+    end)
+
+    return btn
+end
+
+local btnItems = CreateSubTabButton(previewSubTabBar, 1, "Items")
+btnItems:SetPoint("LEFT", 0, 0)
+
+local btnSets = CreateSubTabButton(previewSubTabBar, 2, "Sets")
+btnSets:SetPoint("LEFT", btnItems, "RIGHT", 0, 0)
+
+local function ShowPreviewSubTab(id)
+    local showItems = id == 1
+    if showItems then
+        itemsSubTab:Show()
+        setsSubTab:Hide()
+    else
+        itemsSubTab:Hide()
+        setsSubTab:Show()
+    end
+    btnItems:SetActive(showItems)
+    btnSets:SetActive(not showItems)
+    if not showItems and not setsSubTab.initialized then
+        if ns.InitSetsTab then
+            ns.InitSetsTab(setsSubTab)
+            setsSubTab.initialized = true
+        else
+            print("|cffF5C842<Transmorpher>|r: Error loading Sets tab. Please restart the game client.")
+        end
+    end
+end
+
+btnItems:SetScript("OnClick", function()
+    ShowPreviewSubTab(1)
+end)
+
+btnSets:SetScript("OnClick", function()
+    ShowPreviewSubTab(2)
+end)
+
+ShowPreviewSubTab(1)
+
+mainFrame.tabs.preview.list = ns.CreatePreviewList(itemsSubTab)
+mainFrame.tabs.preview.slider = CreateFrame("Slider", "$parentSlider", itemsSubTab, "UIPanelScrollBarTemplateLightBorder")
 
 do
-    local previewTab = mainFrame.tabs.preview
+    local previewTab = itemsSubTab
     local list = mainFrame.tabs.preview.list
     local slider = mainFrame.tabs.preview.slider
 
@@ -2403,7 +2526,7 @@ do
     list:SetPoint("TOPLEFT", 0, -30) list:SetSize(601, 367)
 
     local label = list:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    label:SetPoint("TOP", list, "BOTTOM", 0, -5)
+    label:SetPoint("TOP", list, "BOTTOM", 0, 0)
     label:SetJustifyH("CENTER") label:SetHeight(10)
     label:SetTextColor(0.85, 0.70, 0.40)
 
@@ -2936,7 +3059,7 @@ end
 -- created in the preview tab block above.
 mainFrame.tabs.preview.subclassMenu = {}
 do
-    local previewTab = mainFrame.tabs.preview
+    local previewTab = mainFrame.tabs.preview.itemsSubTab
     local menu = mainFrame.tabs.preview.subclassMenu
 
     -- Pull references from the preview tab scope
@@ -3112,6 +3235,15 @@ do
     local loadoutNameLabel = previewFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     loadoutNameLabel:SetPoint("TOP", previewTitle, "BOTTOM", 0, -4)
     loadoutNameLabel:SetText("|cff8a7d6aNo loadout selected|r")
+
+    -- Scale labels (removed from top)
+    -- local morphScaleLabel = previewFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    -- morphScaleLabel:SetPoint("TOP", loadoutNameLabel, "BOTTOM", 0, -4)
+    -- morphScaleLabel:SetText("")
+
+    -- local petScaleLabel = previewFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    -- petScaleLabel:SetPoint("TOP", morphScaleLabel, "BOTTOM", 0, -2)
+    -- petScaleLabel:SetText("")
     
     -- Dressing room model (left side, larger)
     local previewModel = CreateFrame("DressUpModel", "$parentPreviewModel", previewFrame)
@@ -3284,8 +3416,21 @@ do
     local specialY2 = specialY - (slotSize + slotSpacing)
     previewSlots["Combat Pet"] = CreateSpecialSlot("Combat Pet", "Interface\\Icons\\Ability_Hunter_BeastCall", startX, specialY2)
     previewSlots["Combat Pet"].label:SetText("C.Pet")
+    
+    -- Combat Pet Scale Label
+    local cpScaleLabel = previewFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    cpScaleLabel:SetPoint("TOPLEFT", previewSlots["Combat Pet"], "BOTTOMLEFT", 0, -2)
+    cpScaleLabel:SetText("")
+    previewSlots["Combat Pet"].scaleLabel = cpScaleLabel
+
     previewSlots["Morph Form"] = CreateSpecialSlot("Morph Form", "Interface\\Icons\\Spell_Shadow_Charm", startX + 85, specialY2)
     previewSlots["Morph Form"].label:SetText("Morph")
+
+    -- Morph Scale Label
+    local mScaleLabel = previewFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    mScaleLabel:SetPoint("TOPLEFT", previewSlots["Morph Form"], "BOTTOMLEFT", 0, -2)
+    mScaleLabel:SetText("")
+    previewSlots["Morph Form"].scaleLabel = mScaleLabel
 
     -- Function to update preview with loadout data
     local lookPreviewTimer = CreateFrame("Frame")
@@ -3297,6 +3442,8 @@ do
         
         if not loadout then
             loadoutNameLabel:SetText("|cff8a7d6aNo loadout selected|r")
+            if previewSlots["Morph Form"].scaleLabel then previewSlots["Morph Form"].scaleLabel:SetText("") end
+            if previewSlots["Combat Pet"].scaleLabel then previewSlots["Combat Pet"].scaleLabel:SetText("") end
             previewModel:SetUnit("player")
             previewModel:Undress()
             -- Clear all preview slots
@@ -3316,6 +3463,24 @@ do
         end
         
         loadoutNameLabel:SetText("|cffffd700" .. (loadout.name or "Loadout") .. "|r")
+        
+        -- Update scale labels
+        if loadout.morphScale then
+            if previewSlots["Morph Form"].scaleLabel then 
+                previewSlots["Morph Form"].scaleLabel:SetText("Scale: " .. loadout.morphScale)
+                previewSlots["Morph Form"].scaleLabel:SetTextColor(0.2, 1.0, 0.2) -- Greenish
+            end
+        else
+            if previewSlots["Morph Form"].scaleLabel then previewSlots["Morph Form"].scaleLabel:SetText("") end
+        end
+        if loadout.combatPetScale then
+            if previewSlots["Combat Pet"].scaleLabel then
+                previewSlots["Combat Pet"].scaleLabel:SetText("Scale: " .. loadout.combatPetScale)
+                previewSlots["Combat Pet"].scaleLabel:SetTextColor(1.0, 0.6, 0.0) -- Orangish
+            end
+        else
+            if previewSlots["Combat Pet"].scaleLabel then previewSlots["Combat Pet"].scaleLabel:SetText("") end
+        end
         
         -- Update dressing room model
         previewModel:SetUnit("player")
@@ -3520,7 +3685,10 @@ do
             mountDisplay = nil,
             petDisplay = nil,
             combatPetDisplay = nil,
-            morphForm = nil
+            combatPetScale = nil,
+            morphForm = nil,
+            morphScale = nil,
+            titleID = nil
         }
         
         -- Capture all item slots
@@ -3550,9 +3718,18 @@ do
             end
             if TransmorpherCharacterState.HunterPetDisplay then
                 loadout.combatPetDisplay = TransmorpherCharacterState.HunterPetDisplay
+                if TransmorpherCharacterState.HunterPetScale then
+                    loadout.combatPetScale = TransmorpherCharacterState.HunterPetScale
+                end
             end
             if TransmorpherCharacterState.Morph then
                 loadout.morphForm = TransmorpherCharacterState.Morph
+                if TransmorpherCharacterState.MorphScale then
+                    loadout.morphScale = TransmorpherCharacterState.MorphScale
+                end
+            end
+            if TransmorpherCharacterState.TitleID then
+                loadout.titleID = TransmorpherCharacterState.TitleID
             end
         end
         
@@ -3774,19 +3951,23 @@ do
         for index, slotName in pairs(slotOrder) do
             local itemId = loadout.items and loadout.items[index]
             if itemId and itemId ~= 0 and slotToEquipSlotId[slotName] then
-                local equippedId = GetEquippedItemForSlot(slotName)
                 local slot = mainFrame.slots[slotName]
-                if equippedId and equippedId == itemId then
-                    slot.isMorphed = false
-                    slot.morphedItemId = nil
-                    slot:SetItem(itemId)
-                    HideMorphGlow(slot)
-                else
-                    SendMorphCommand("ITEM:" .. slotToEquipSlotId[slotName] .. ":" .. itemId)
-                    slot.isMorphed = true
-                    slot.morphedItemId = itemId
-                    slot:SetItem(itemId)
+                if slot and slot.isHiddenSlot then
                     ShowMorphGlow(slot)
+                else
+                    local equippedId = GetEquippedItemForSlot(slotName)
+                    if equippedId and equippedId == itemId then
+                        slot.isMorphed = false
+                        slot.morphedItemId = nil
+                        slot:SetItem(itemId)
+                        HideMorphGlow(slot)
+                    else
+                        SendMorphCommand("ITEM:" .. slotToEquipSlotId[slotName] .. ":" .. itemId)
+                        slot.isMorphed = true
+                        slot.morphedItemId = itemId
+                        slot:SetItem(itemId)
+                        ShowMorphGlow(slot)
+                    end
                 end
             end
         end
@@ -3843,10 +4024,33 @@ do
             if TransmorpherCharacterState then
                 TransmorpherCharacterState.HunterPetDisplay = loadout.combatPetDisplay
             end
+            
+            -- Apply combat pet scale
+            if loadout.combatPetScale then
+                SendMorphCommand("HPET_SCALE:" .. loadout.combatPetScale)
+                if TransmorpherCharacterState then
+                    TransmorpherCharacterState.HunterPetScale = loadout.combatPetScale
+                end
+                if _G["TransmorpherFrameCombatPetsTabBottomBarHPetSizeInput"] then
+                    _G["TransmorpherFrameCombatPetsTabBottomBarHPetSizeInput"]:SetText(tostring(loadout.combatPetScale))
+                end
+            else
+                SendMorphCommand("HPET_SCALE:1.0")
+                if TransmorpherCharacterState then
+                    TransmorpherCharacterState.HunterPetScale = 1.0
+                end
+                if _G["TransmorpherFrameCombatPetsTabBottomBarHPetSizeInput"] then
+                    _G["TransmorpherFrameCombatPetsTabBottomBarHPetSizeInput"]:SetText("1.0")
+                end
+            end
         else
             SendMorphCommand("HPET_RESET")
             if TransmorpherCharacterState then
                 TransmorpherCharacterState.HunterPetDisplay = nil
+                TransmorpherCharacterState.HunterPetScale = nil
+            end
+            if _G["TransmorpherFrameCombatPetsTabBottomBarHPetSizeInput"] then
+                _G["TransmorpherFrameCombatPetsTabBottomBarHPetSizeInput"]:SetText("1.0")
             end
         end
         
@@ -3856,10 +4060,45 @@ do
             if TransmorpherCharacterState then
                 TransmorpherCharacterState.Morph = loadout.morphForm
             end
+            
+            -- Apply morph scale
+            if loadout.morphScale then
+                SendMorphCommand("SCALE:" .. loadout.morphScale)
+                if TransmorpherCharacterState then
+                    TransmorpherCharacterState.MorphScale = loadout.morphScale
+                end
+                if _G["TransmorpherFrameMorphTabMorphSizeInput"] then
+                    _G["TransmorpherFrameMorphTabMorphSizeInput"]:SetText(tostring(loadout.morphScale))
+                end
+            else
+                SendMorphCommand("SCALE:1.0")
+                if TransmorpherCharacterState then
+                    TransmorpherCharacterState.MorphScale = 1.0
+                end
+                if _G["TransmorpherFrameMorphTabMorphSizeInput"] then
+                    _G["TransmorpherFrameMorphTabMorphSizeInput"]:SetText("1.0")
+                end
+            end
         else
             SendMorphCommand("MORPH:0")
             if TransmorpherCharacterState then
                 TransmorpherCharacterState.Morph = nil
+                TransmorpherCharacterState.MorphScale = nil
+            end
+            if _G["TransmorpherFrameMorphTabMorphSizeInput"] then
+                _G["TransmorpherFrameMorphTabMorphSizeInput"]:SetText("1.0")
+            end
+        end
+
+        if loadout.titleID and loadout.titleID > 0 then
+            SendMorphCommand("TITLE:" .. loadout.titleID)
+            if TransmorpherCharacterState then
+                TransmorpherCharacterState.TitleID = loadout.titleID
+            end
+        else
+            SendMorphCommand("TITLE_RESET")
+            if TransmorpherCharacterState then
+                TransmorpherCharacterState.TitleID = nil
             end
         end
         
@@ -4014,6 +4253,9 @@ do
         btnM:SetScript("OnClick", function()
             if IsMorpherReady() then
                 SendMorphCommand("MORPH:" .. ids[2])
+                SendMorphCommand("SCALE:1.0")
+                if TransmorpherCharacterState then TransmorpherCharacterState.MorphScale = 1.0 end
+                if _G["TransmorpherFrameMorphTabMorphSizeInput"] then _G["TransmorpherFrameMorphTabMorphSizeInput"]:SetText("1.0") end
                 UpdatePreviewModel()
                 UpdateSpecialSlots()
                 SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Morphed to " .. raceName .. " Male (" .. ids[2] .. ")")
@@ -4037,6 +4279,9 @@ do
         btnF:SetScript("OnClick", function()
             if IsMorpherReady() then
                 SendMorphCommand("MORPH:" .. ids[3])
+                SendMorphCommand("SCALE:1.0")
+                if TransmorpherCharacterState then TransmorpherCharacterState.MorphScale = 1.0 end
+                if _G["TransmorpherFrameMorphTabMorphSizeInput"] then _G["TransmorpherFrameMorphTabMorphSizeInput"]:SetText("1.0") end
                 UpdatePreviewModel()
                 UpdateSpecialSlots()
                 SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Morphed to " .. raceName .. " Female (" .. ids[3] .. ")")
@@ -4332,6 +4577,9 @@ do
         if selectedSearchID then
             if IsMorpherReady() then
                 SendMorphCommand("MORPH:" .. selectedSearchID)
+                SendMorphCommand("SCALE:1.0")
+                if TransmorpherCharacterState then TransmorpherCharacterState.MorphScale = 1.0 end
+                if _G["TransmorpherFrameMorphTabMorphSizeInput"] then _G["TransmorpherFrameMorphTabMorphSizeInput"]:SetText("1.0") end
                 UpdatePreviewModel()
                 SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Morphed to " .. (selectedSearchName or "creature") .. " (" .. selectedSearchID .. ")")
             end
@@ -4342,6 +4590,9 @@ do
             local id = tonumber(text:match("%((%d+)%)")) or tonumber(text)
             if id and id > 0 and IsMorpherReady() then
                 SendMorphCommand("MORPH:" .. id)
+                SendMorphCommand("SCALE:1.0")
+                if TransmorpherCharacterState then TransmorpherCharacterState.MorphScale = 1.0 end
+                if _G["TransmorpherFrameMorphTabMorphSizeInput"] then _G["TransmorpherFrameMorphTabMorphSizeInput"]:SetText("1.0") end
                 UpdatePreviewModel()
                 SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Morphed to display ID " .. id)
             end
@@ -4355,6 +4606,9 @@ do
         if selectedSearchID then
             if IsMorpherReady() then
                 SendMorphCommand("MORPH:" .. selectedSearchID)
+                SendMorphCommand("SCALE:1.0")
+                if TransmorpherCharacterState then TransmorpherCharacterState.MorphScale = 1.0 end
+                if _G["TransmorpherFrameMorphTabMorphSizeInput"] then _G["TransmorpherFrameMorphTabMorphSizeInput"]:SetText("1.0") end
                 UpdatePreviewModel()
                 UpdateSpecialSlots()
                 SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Morphed to " .. (selectedSearchName or "creature") .. " (" .. selectedSearchID .. ")")
@@ -4367,6 +4621,9 @@ do
             local id = tonumber(text:match("%((%d+)%)")) or tonumber(text)
             if id and id > 0 and IsMorpherReady() then
                 SendMorphCommand("MORPH:" .. id)
+                SendMorphCommand("SCALE:1.0")
+                if TransmorpherCharacterState then TransmorpherCharacterState.MorphScale = 1.0 end
+                if _G["TransmorpherFrameMorphTabMorphSizeInput"] then _G["TransmorpherFrameMorphTabMorphSizeInput"]:SetText("1.0") end
                 UpdatePreviewModel()
                 UpdateSpecialSlots()
                 SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Morphed to display ID " .. id)
@@ -4406,6 +4663,9 @@ do
         local scale = tonumber(sizeEditBox:GetText())
         if scale and scale > 0.1 and scale < 10.0 and IsMorpherReady() then
             SendMorphCommand("SCALE:" .. scale)
+            if TransmorpherCharacterState then
+                TransmorpherCharacterState.MorphScale = scale
+            end
             SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Scaled character to " .. scale)
             PlaySound("gsTitleOptionOK")
         else
@@ -4543,6 +4803,9 @@ do
             useBtn:SetScript("OnClick", function()
                 if IsMorpherReady() then
                     SendMorphCommand("MORPH:" .. fav.id)
+                    SendMorphCommand("SCALE:1.0")
+                    if TransmorpherCharacterState then TransmorpherCharacterState.MorphScale = 1.0 end
+                    if _G["TransmorpherFrameMorphTabMorphSizeInput"] then _G["TransmorpherFrameMorphTabMorphSizeInput"]:SetText("1.0") end
                     UpdatePreviewModel()
                     UpdateSpecialSlots()
                     SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Morphed to " .. fav.name .. " (" .. fav.id .. ")")
@@ -4680,6 +4943,9 @@ do
         btn:SetScript("OnClick", function()
             if IsMorpherReady() then
                 SendMorphCommand("MORPH:" .. creature.id)
+                SendMorphCommand("SCALE:1.0")
+                if TransmorpherCharacterState then TransmorpherCharacterState.MorphScale = 1.0 end
+                if _G["TransmorpherFrameMorphTabMorphSizeInput"] then _G["TransmorpherFrameMorphTabMorphSizeInput"]:SetText("1.0") end
                 UpdatePreviewModel()
                 UpdateSpecialSlots()
                 SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Morphed to " .. creature.name .. " (" .. creature.id .. ")")
@@ -4709,10 +4975,13 @@ do
     btnResetMorph:SetScript("OnClick", function()
         if IsMorpherReady() then
             SendMorphCommand("MORPH:0")
+            SendMorphCommand("SCALE:1.0")
             -- Immediately clear the state for instant visual update
             if TransmorpherCharacterState then
                 TransmorpherCharacterState.Morph = nil
+                TransmorpherCharacterState.MorphScale = nil
             end
+            if _G["TransmorpherFrameMorphTabMorphSizeInput"] then _G["TransmorpherFrameMorphTabMorphSizeInput"]:SetText("1.0") end
             UpdatePreviewModel()
             UpdateSpecialSlots()
             SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Character morph reset!")
@@ -5195,6 +5464,12 @@ do
     btnResetPet:SetScript("OnClick", function()
         if IsMorpherReady() then
             SendMorphCommand("PET_RESET")
+            SendMorphCommand("HPET_RESET")
+            SendMorphCommand("HPET_SCALE:1.0")
+            if TransmorpherCharacterState then
+                TransmorpherCharacterState.HunterPetScale = nil
+            end
+            if _G["TransmorpherFrameCombatPetsTabBottomBarHPetSizeInput"] then _G["TransmorpherFrameCombatPetsTabBottomBarHPetSizeInput"]:SetText("1.0") end
             UpdateSpecialSlots()
             SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Pet appearance reset!")
         end
@@ -5271,6 +5546,9 @@ do
         if id and id > 0 then
             if IsMorpherReady() then
                 SendMorphCommand("HPET_MORPH:" .. id)
+                SendMorphCommand("HPET_SCALE:1.0")
+                if TransmorpherCharacterState then TransmorpherCharacterState.HunterPetScale = 1.0 end
+                if _G["TransmorpherFrameCombatPetsTabBottomBarHPetSizeInput"] then _G["TransmorpherFrameCombatPetsTabBottomBarHPetSizeInput"]:SetText("1.0") end
                 UpdateSpecialSlots()
                 SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Combat pet morphed to display ID " .. id)
             else
@@ -5462,6 +5740,9 @@ do
         local scale = tonumber(petSizeBox:GetText())
         if scale and scale >= 0.1 and scale <= 10.0 and IsMorpherReady() then
             SendMorphCommand("HPET_SCALE:" .. scale)
+            if TransmorpherCharacterState then
+                TransmorpherCharacterState.HunterPetScale = scale
+            end
             -- Force refresh by resetting and reapplying the morph
             if TransmorpherCharacterState and TransmorpherCharacterState.HunterPetDisplay and TransmorpherCharacterState.HunterPetDisplay > 0 then
                 local displayID = TransmorpherCharacterState.HunterPetDisplay
@@ -5738,6 +6019,9 @@ do
             local entry = hpetFilteredList[hpetSelectedIdx]
             if IsMorpherReady() then
                 SendMorphCommand("HPET_MORPH:" .. entry.displayID)
+                SendMorphCommand("HPET_SCALE:1.0")
+                if TransmorpherCharacterState then TransmorpherCharacterState.HunterPetScale = 1.0 end
+                if _G["TransmorpherFrameCombatPetsTabBottomBarHPetSizeInput"] then _G["TransmorpherFrameCombatPetsTabBottomBarHPetSizeInput"]:SetText("1.0") end
                 UpdateSpecialSlots()
                 SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Combat pet morphed to " .. entry.name .. " (" .. entry.displayID .. ")")
             else
@@ -6021,7 +6305,7 @@ do
     
     local infoCard = CreateFrame("Frame", nil, scrollChild)
     infoCard:SetPoint("TOPLEFT", 10, yOffset)
-    infoCard:SetSize(scrollChild:GetWidth() - 20, 60)
+    infoCard:SetSize(scrollChild:GetWidth() - 20, 260)
     infoCard:SetBackdrop({
         bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -6037,12 +6321,259 @@ do
     infoText:SetJustifyH("LEFT")
     infoText:SetJustifyV("TOP")
     infoText:SetTextColor(0.95, 0.88, 0.65)
-    infoText:SetText("Transmorpher v1.0.9\n\nA client-side transmog system for WotLK 3.3.5a.\nTransform your character appearance, equipment, mounts, and pets.\nRequires dinput8.dll to function.")
+    infoText:SetText("Transmorpher v1.1.1\n\nA client-side transmog system for WotLK 3.3.5a.\nTransform your character appearance, equipment, mounts, and pets.\nRequires dinput8.dll to function.\n\nLatest Update Changelog\n- Fixed all Hunter combat pet IDs\n- Fixed morph size not resetting when switching to another morph\n- Fixed Interact with Mouseover / Interact with Target keybinds becoming dysfunctional while addon is enabled\n- Fixed Hide Equipment not persistent when applying a new item\n- Added a new Sets system containing all 3.3.5 class sets (441 sets)\n- Added morph scale and pet scale to loadout saves\n- Added time control for day/night time\n- Added title morphing")
     
-    yOffset = yOffset - 70
+    yOffset = yOffset - 270
     
     -- Set scroll child height
     scrollChild:SetHeight(math.abs(yOffset) + 20)
+end
+
+---------------- TIME TAB ----------------
+
+do
+    local envTab = mainFrame.tabs.env
+    
+    -- Create a scrollable content area
+    local scrollFrame = CreateFrame("ScrollFrame", "$parentEnvScroll", envTab, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", 8, -8)
+    scrollFrame:SetPoint("BOTTOMRIGHT", -28, 8)
+    
+    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
+    scrollChild:SetSize(scrollFrame:GetWidth(), 1)
+    scrollFrame:SetScrollChild(scrollChild)
+    
+    local yOffset = -16
+    
+    local function createSectionHeader(parent, title, y)
+        local header = CreateFrame("Frame", nil, parent)
+        header:SetPoint("TOPLEFT", 6, y)
+        header:SetSize(parent:GetWidth() - 12, 28)
+        
+        -- Background
+        header:SetBackdrop({
+            bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            tile = true, tileSize = 16, edgeSize = 12,
+            insets = { left = 3, right = 3, top = 3, bottom = 3 }
+        })
+        header:SetBackdropColor(0.12, 0.10, 0.06, 0.8)
+        header:SetBackdropBorderColor(0.80, 0.65, 0.22, 0.6)
+        
+        local text = header:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        text:SetPoint("LEFT", 10, 0)
+        text:SetText(title)
+        text:SetTextColor(1.0, 0.82, 0.20)
+        
+        return header
+    end
+    
+    -- Time Control Section
+    createSectionHeader(scrollChild, "Time Control", yOffset)
+    yOffset = yOffset - 40
+    
+    -- Time Slider
+    local sliderLabel = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    sliderLabel:SetPoint("TOPLEFT", 20, yOffset)
+    sliderLabel:SetText("Time of Day (Hours):")
+    
+    local slider = CreateFrame("Slider", "$parentTimeSlider", scrollChild, "OptionsSliderTemplate")
+    slider:SetPoint("LEFT", sliderLabel, "RIGHT", 20, 0)
+    slider:SetWidth(200)
+    slider:SetHeight(20)
+    slider:SetMinMaxValues(0.0, 24.0)
+    
+    slider:SetScript("OnShow", function(self)
+        if TransmorpherCharacterState and TransmorpherCharacterState.WorldTime then
+            self:SetValue(TransmorpherCharacterState.WorldTime * 24.0)
+        else
+            self:SetValue(12.0)
+        end
+        local v = math.floor(self:GetValue() * 10) / 10
+        _G[self:GetName().."Text"]:SetText(tostring(v))
+    end)
+
+    if TransmorpherCharacterState and TransmorpherCharacterState.WorldTime then
+        slider:SetValue(TransmorpherCharacterState.WorldTime * 24.0)
+    else
+        slider:SetValue(12.0) -- Default to Noon
+    end
+    
+    slider:SetValueStep(0.5)
+    _G[slider:GetName().."Low"]:SetText("0")
+    _G[slider:GetName().."High"]:SetText("24")
+    _G[slider:GetName().."Text"]:SetText(tostring(math.floor(slider:GetValue() * 10) / 10))
+    
+    slider:SetScript("OnValueChanged", function(self, value)
+        local v = math.floor(value * 10) / 10
+        _G[self:GetName().."Text"]:SetText(tostring(v))
+    end)
+    
+    yOffset = yOffset - 50
+    
+    -- Buttons
+    local btnApply = CreateGoldenButton("$parentApplyTime", scrollChild)
+    btnApply:SetPoint("TOPLEFT", 20, yOffset)
+    btnApply:SetSize(140, 24)
+    btnApply:SetText("Apply & Save")
+    
+    btnApply:SetScript("OnClick", function()
+        local hours = slider:GetValue()
+        -- Convert 0-24 hours to 0.0-1.0 float
+        local timeVal = hours / 24.0
+        
+        if IsMorpherReady() then
+            SendMorphCommand("TIME:" .. timeVal)
+            if not TransmorpherCharacterState then TransmorpherCharacterState = {} end
+            TransmorpherCharacterState.WorldTime = timeVal
+            SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Time set to " .. hours .. ":00 (Saved per-character)")
+        else
+            SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: |cffff0000DLL not loaded!|r")
+        end
+        PlaySound("gsTitleOptionOK")
+    end)
+    
+    local btnReset = CreateGoldenButton("$parentResetTime", scrollChild)
+    btnReset:SetPoint("LEFT", btnApply, "RIGHT", 10, 0)
+    btnReset:SetSize(140, 24)
+    btnReset:SetText("Reset Time")
+    
+    btnReset:SetScript("OnClick", function()
+        if IsMorpherReady() then
+            SendMorphCommand("TIME:-1") -- Negative value triggers reset/uninstall hook
+            if TransmorpherCharacterState then TransmorpherCharacterState.WorldTime = nil end
+            SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Time control disabled (Game time restored).")
+        end
+        PlaySound("gsTitleOptionOK")
+    end)
+    
+    yOffset = yOffset - 50
+    
+    -- Info Text
+    local infoText = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    infoText:SetPoint("TOPLEFT", 20, yOffset)
+    infoText:SetWidth(scrollChild:GetWidth() - 40)
+    infoText:SetJustifyH("LEFT")
+    infoText:SetText("Note: This overrides the client's local time of day. 0 = Midnight, 12 = Noon.\nSaved settings are automatically applied on login.")
+    
+    yOffset = yOffset - 60
+
+    -- Title Morph Section
+    createSectionHeader(scrollChild, "Title Morph", yOffset)
+    yOffset = yOffset - 40
+
+    local titleSearch = CreateFrame("EditBox", "$parentTitleSearch", scrollChild, "InputBoxTemplate")
+    titleSearch:SetPoint("TOPLEFT", 25, yOffset)
+    titleSearch:SetSize(200, 20)
+    titleSearch:SetAutoFocus(false)
+    titleSearch:SetTextInsets(0, 0, 0, 0)
+    titleSearch:SetFontObject("ChatFontNormal")
+    
+    local searchLabel = titleSearch:CreateFontString(nil, "ARTWORK", "GameFontDisable")
+    searchLabel:SetPoint("LEFT", 0, 0)
+    searchLabel:SetText("Search Titles...")
+    
+    titleSearch:SetScript("OnEditFocusGained", function(self) searchLabel:Hide() end)
+    titleSearch:SetScript("OnEditFocusLost", function(self) 
+        if self:GetText() == "" then searchLabel:Show() end 
+    end)
+    
+    -- Title List Scroll Frame
+    local listFrame = CreateFrame("ScrollFrame", "$parentTitleList", scrollChild, "UIPanelScrollFrameTemplate")
+    listFrame:SetPoint("TOPLEFT", 20, yOffset - 30)
+    listFrame:SetSize(280, 150)
+    
+    local listContent = CreateFrame("Frame", nil, listFrame)
+    listContent:SetSize(280, 1)
+    listFrame:SetScrollChild(listContent)
+    
+    -- Background for list
+    local listBg = CreateFrame("Frame", nil, listFrame)
+    listBg:SetPoint("TOPLEFT", -5, 5)
+    listBg:SetPoint("BOTTOMRIGHT", 25, -5)
+    listBg:SetBackdrop({
+        bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 12,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 }
+    })
+    listBg:SetBackdropColor(0, 0, 0, 0.5)
+    listBg:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+    listBg:SetFrameLevel(listFrame:GetFrameLevel() - 1)
+    
+    local titleButtons = {}
+    local function UpdateTitleList(filter)
+        -- Hide all buttons
+        for _, btn in pairs(titleButtons) do btn:Hide() end
+        
+        if not Transmorpher_Titles then return end
+        
+        local index = 0
+        local btnHeight = 20
+        
+        for _, titleData in ipairs(Transmorpher_Titles) do
+            local name = titleData.name:gsub("%%s", ""):gsub("^%s+", ""):gsub("%s+$", "")
+            if name == "" then name = titleData.name end -- Fallback
+            
+            if not filter or filter == "" or name:lower():find(filter:lower(), 1, true) then
+                index = index + 1
+                
+                local btn = titleButtons[index]
+                if not btn then
+                    btn = CreateFrame("Button", nil, listContent)
+                    btn:SetSize(260, btnHeight)
+                    btn:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+                    
+                    local text = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightLeft")
+                    text:SetPoint("LEFT", 5, 0)
+                    btn.text = text
+                    
+                    btn:SetScript("OnClick", function(self)
+                        if IsMorpherReady() then
+                            SendMorphCommand("TITLE:" .. self.titleID)
+                            if not TransmorpherCharacterState then TransmorpherCharacterState = {} end
+                            TransmorpherCharacterState.TitleID = self.titleID
+                            SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Title set to '" .. self.titleName .. "' (Saved)")
+                            PlaySound("gsTitleOptionOK")
+                        end
+                    end)
+                    
+                    titleButtons[index] = btn
+                end
+                
+                btn:SetPoint("TOPLEFT", 0, -((index - 1) * btnHeight))
+                btn.text:SetText(name)
+                btn.titleID = titleData.id
+                btn.titleName = name
+                btn:Show()
+            end
+        end
+        
+        listContent:SetHeight(math.max(1, index * btnHeight))
+    end
+    
+    titleSearch:SetScript("OnTextChanged", function(self)
+        UpdateTitleList(self:GetText())
+    end)
+    
+    -- Initial population
+    UpdateTitleList("")
+    
+    local btnResetTitle = CreateGoldenButton("$parentResetTitle", scrollChild)
+    btnResetTitle:SetPoint("TOPLEFT", listFrame, "BOTTOMLEFT", 0, -10)
+    btnResetTitle:SetSize(140, 24)
+    btnResetTitle:SetText("Reset Title")
+    
+    btnResetTitle:SetScript("OnClick", function()
+        if IsMorpherReady() then
+            SendMorphCommand("TITLE_RESET")
+            if TransmorpherCharacterState then TransmorpherCharacterState.TitleID = nil end
+            SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Title reset.")
+        end
+        PlaySound("gsTitleOptionOK")
+    end)
+
+    scrollChild:SetHeight(math.abs(yOffset) + 250)
 end
 
 ---------------- EVENT LOOP & PERSISTENCE ----------------
@@ -6114,10 +6645,8 @@ do
         end
     end)
 
-    local origInteractUnit = InteractUnit
-    InteractUnit = function(unit)
-        HandleSmartIntervention(unit)
-        return origInteractUnit(unit)
+    if InteractUnit then
+        hooksecurefunc("InteractUnit", HandleSmartIntervention)
     end
     mainFrame:RegisterEvent("UNIT_AURA")
     mainFrame:RegisterEvent("CHAT_MSG_ADDON")
@@ -6134,9 +6663,12 @@ do
     local lastMainHand = nil
     local lastOffHand = nil
 
-    -- One-shot delayed send (reusable timer, no CreateFrame spam)
+    -- ============================================================
+    -- DELAYED SEND TIMER — handles scheduled morph updates
+    -- ============================================================
     local delayedSendTimer = CreateFrame("Frame")
     delayedSendTimer:Hide()
+    delayedSendTimer.remaining = 0
     delayedSendTimer:SetScript("OnUpdate", function(self, elapsed)
         self.remaining = self.remaining - elapsed
         if self.remaining <= 0 then
@@ -6150,11 +6682,29 @@ do
         delayedSendTimer:Show()
     end
 
+    -- ============================================================
+    -- MOUNT FIX TIMER — re-applies mount morph after login/zone
+    -- to ensure the mount model is fully loaded before morphing.
+    -- ============================================================
+    local mountFixTimer = CreateFrame("Frame")
+    mountFixTimer:Hide()
+    mountFixTimer.elapsed = 0
+    mountFixTimer:SetScript("OnUpdate", function(self, elapsed)
+        self.elapsed = self.elapsed + elapsed
+        if self.elapsed >= 1.0 then
+            self:Hide()
+            if IsMounted() and TransmorpherCharacterState and TransmorpherCharacterState.MountDisplay and GetSettings().saveMountMorph then
+                SendMorphCommand("MOUNT_MORPH:" .. TransmorpherCharacterState.MountDisplay)
+                -- Also sync scale if needed, though usually handled by morph
+            end
+        end
+    end)
+
     mainFrame:SetScript("OnEvent", function(self, event, ...)
         if event == "PLAYER_LOGIN" then
             -- Initialize per-character SavedVariables
             if not TransmorpherCharacterState then
-                TransmorpherCharacterState = {Items={}, Morph=nil, Scale=nil, MountDisplay=nil, PetDisplay=nil, HunterPetDisplay=nil, HunterPetScale=nil, EnchantMH=nil, EnchantOH=nil}
+                TransmorpherCharacterState = {Items={}, Morph=nil, Scale=nil, MountDisplay=nil, PetDisplay=nil, HunterPetDisplay=nil, HunterPetScale=nil, EnchantMH=nil, EnchantOH=nil, TitleID=nil}
             end
             if not TransmorpherCharacterState.Items then
                 TransmorpherCharacterState.Items = {}
@@ -6193,6 +6743,12 @@ do
                 -- with a 0.05 s timer, but schedule a 0.4 s fallback just in case.
                 ScheduleMorphSend(0.4)
             end
+            
+            -- Schedule mount fix check
+            if IsMounted() then
+                mountFixTimer.elapsed = 0
+                mountFixTimer:Show()
+            end
 
             -- Restore the UI (slots, glows, dressing room) from saved state
             RestoreMorphedUI()
@@ -6215,6 +6771,25 @@ do
                 SendRawMorphCommand("SUSPEND")
             else
                 ScheduleMorphSend(0.05)
+            end
+            
+            -- Apply saved World Time (Per-Character)
+            if TransmorpherCharacterState and TransmorpherCharacterState.WorldTime then
+                SendMorphCommand("TIME:" .. TransmorpherCharacterState.WorldTime)
+            elseif GetSettings().worldTime then
+                -- Legacy fallback
+                SendMorphCommand("TIME:" .. GetSettings().worldTime)
+            end
+            
+            -- Apply saved Title (Per-Character)
+            if TransmorpherCharacterState and TransmorpherCharacterState.TitleID then
+                SendMorphCommand("TITLE:" .. TransmorpherCharacterState.TitleID)
+            end
+
+            -- Schedule mount fix check
+            if IsMounted() then
+                mountFixTimer.elapsed = 0
+                mountFixTimer:Show()
             end
 
         elseif event == "UPDATE_SHAPESHIFT_FORM" then
@@ -6623,4 +7198,4 @@ do
 end
 
 -- Print load message
-DEFAULT_CHAT_FRAME:AddMessage("|cffF5C842\226\154\148 Transmorpher|r v1.0.3 loaded \226\128\148 |cffC8AA6E/morph|r or click the button on your character model.")
+DEFAULT_CHAT_FRAME:AddMessage("|cffF5C842\226\154\148 Transmorpher|r v1.1.1 loaded \226\128\148 |cffC8AA6E/morph|r or click the button on your character model.")

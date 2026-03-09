@@ -9,393 +9,340 @@
 local _, ns = ...
 
 ns.combatPetsDB = {
-    -- ==============================
-    -- BEARS
-    -- ==============================
-    { "Brown Bear",            "Bear",         822,   "Creature\\Bear\\Bear.m2" },
-    { "Black Bear",            "Bear",         820,   "Creature\\Bear\\Bear.m2" },
-    { "Polar Bear",	"Bear",	27659, "Creature\\Bear2\\Bear2.m2" },
-    { "Grizzly Bear",	"Bear",	1083, "Creature\\Bear2\\Bear2.m2" },
-    { "Dire Bear (Black)",     "Bear",         15366, "Creature\\Bear2\\Bear2.m2" },
-    { "Armored Bear (Brown)",  "Bear",         29756, "Creature\\Bear2\\Bear2.m2" },  -- Fixed: was 29757 (invalid)
-    { "Corrupted Bear",        "Bear",         12037, "Creature\\Bear\\Bear.m2" },
-    { "Ghost Bear",            "Bear",         26646, "Creature\\Bear2\\Bear2.m2" },  -- Fixed: was 26647 (invalid)
-    { "Ironforge Bear",        "Bear",         3809,  "Creature\\Bear\\Bear.m2" },
-    { "Ashenvale Bear",	"Bear",	982,  "Creature\\Bear\\Bear.m2" },
 
     -- ==============================
-    -- BOARS
+    -- WOLFS
     -- ==============================
-    { "Boar (Brown)",          "Boar",         488,   "Creature\\Boar\\Boar.m2" },
-    { "Boar (Black)",          "Boar",         2966,  "Creature\\Boar\\Boar.m2" },
-    { "Boar (White)",          "Boar",         16195, "Creature\\Boar\\Boar.m2" },
-    { "Armored Boar",          "Boar",         25766, "Creature\\Boar\\Boar.m2" },  -- Fixed: was 25767 (invalid)
-    { "Dire Boar",             "Boar",         23932, "Creature\\Boar\\Boar.m2" },
-    { "Helboar",	"Boar",	11410, "Creature\\HelBoar\\HelBoar.m2" },
-    { "Felboar",               "Boar",         20868, "Creature\\HelBoar\\HelBoar.m2" },
-    { "Plagued Boar",          "Boar",         7099,  "Creature\\Boar\\Boar.m2" },
+    { "Wolf (Wolfskinbluebrown)", "Wolf", 18063, "Creature\\Wolf\\Wolf.m2" },
+    { "Wolf (Wolfskinbrown)", "Wolf", 17079, "Creature\\Wolf\\Wolf.m2" },
+    { "Wolf (Wolfskindarkblack)", "Wolf", 741, "Creature\\Wolf\\Wolf.m2" },
+    { "Wolf (Wolfskindarkgrey)", "Wolf", 11414, "Creature\\Wolf\\Wolf.m2" },
+    { "Wolf (Wolfskinlightblue)", "Wolf", 11412, "Creature\\Wolf\\Wolf.m2" },
+    { "Wolf (Wolfskinlightgrey)", "Wolf", 11415, "Creature\\Wolf\\Wolf.m2" },
+    { "Wolf (Wolfskinreddishbrown)", "Wolf", 9372, "Creature\\Wolf\\Wolf.m2" },
+    { "Wolf (Dragonwhelpskinblack)", "Wolf", 6288, "Creature\\Wolf\\Wolf.m2" },
+    { "Wolf (Magehunterred)", "Wolf", 25785, "Creature\\Wolf\\Wolf.m2" },
+    { "Wolf (Pvpridingdirewolfskindarkblack)", "Wolf", 14334, "Creature\\Wolf\\Wolf.m2" },
+    { "Wolf (_ghost)", "Wolf", 22130, "Creature\\Wolf\\Wolf.m2" },
+    { "Wolf (Arctic)", "Wolf", 801, "Creature\\Wolf\\Wolf.m2" },
+    { "Wolf (Arcticalpha)", "Wolf", 868, "Creature\\Wolf\\Wolf.m2" },
+    { "Wolf (Black)", "Wolf", 781, "Creature\\Wolf\\Wolf.m2" },
+    { "Wolf (Coyote)", "Wolf", 161, "Creature\\Wolf\\Wolf.m2" },
+    { "Wolf (Diseased)", "Wolf", 31048, "Creature\\Wolf\\Wolf.m2" },
+    { "Wolf (Timber)", "Wolf", 903, "Creature\\Wolf\\Wolf.m2" },
+    { "Wolf (Worgblack)", "Wolf", 22003, "Creature\\Worg\\Worg.m2" },
+    { "Wolf (Worgbrown)", "Wolf", 22502, "Creature\\Worg\\Worg.m2" },
+    { "Wolf (Worggray)", "Wolf", 22501, "Creature\\Worg\\Worg.m2" },
+    { "Wolf (Worgwhite)", "Wolf", 22089, "Creature\\Worg\\Worg.m2" },
 
     -- ==============================
-    -- CATS (Tigers, Lions, Panthers, Lynx)
+    -- CATS
     -- ==============================
-    { "Tiger (Orange)",        "Cat",          275,   "Creature\\Tiger\\Tiger.m2" },  -- Fixed: was 274 (invalid)
-    { "Tiger (White)",         "Cat",          1192,  "Creature\\Tiger\\Tiger.m2" },  -- Fixed: was 1191 (invalid)
-    { "Snow Leopard",          "Cat",          1713,  "Creature\\Tiger\\Tiger.m2" },
-    { "Black Panther",         "Cat",          282,   "Creature\\Panther\\Panther.m2" },
-    { "Nightsaber (Purple)",   "Cat",          1554,  "Creature\\Panther\\Panther.m2" },  -- Fixed: was 1553 (invalid)
-    { "Nightsaber (Black)",    "Cat",          892,   "Creature\\Panther\\Panther.m2" },
-    { "Lion",                  "Cat",          2292,  "Creature\\Lion\\Lion.m2" },
-    { "Savannah Prowler",      "Cat",          2386,  "Creature\\Lion\\Lion.m2" },  -- Fixed: was 2385 (invalid)
-    { "Ghost Saber",	"Cat",	4472,  "Creature\\Panther\\Panther.m2" },
-    { "Lynx (Orange)",         "Cat",          21517, "Creature\\Lynx\\Lynx.m2" },  -- Fixed: was 21516 (invalid)
-    { "Lynx (Springpaw)",      "Cat",          20682, "Creature\\Lynx\\Lynx.m2" },
-    { "Lynx (White)",          "Cat",          21515, "Creature\\Lynx\\Lynx.m2" },
-    { "Saber Worg",            "Cat",          22133, "Creature\\Panther\\Panther.m2" },
-    { "Frostsaber",            "Cat",          9551,  "Creature\\Panther\\Panther.m2" },
-    { "Shadowclaw",            "Cat",          5765,  "Creature\\Panther\\Panther.m2" },
-    { "Stranglethorn Tiger",   "Cat",          1196,  "Creature\\Tiger\\Tiger.m2" },
-
-    -- ==============================
-    -- CRABS
-    -- ==============================
-    { "Crab (Red)",            "Crab",         6761,  "Creature\\Crab\\Crab.m2" },
-    { "Crab (Blue)",           "Crab",         2955,  "Creature\\Crab\\Crab.m2" },
-    { "Crab (Green)",          "Crab",         14555, "Creature\\Crab\\Crab.m2" },
-    { "Ghost Crab",            "Crab",         26899, "Creature\\Crab\\Crab.m2" },
-    { "Monstrous Crab",        "Crab",         26089, "Creature\\Crab\\Crab.m2" },
-    { "Crab (White)",          "Crab",         26096, "Creature\\Crab\\Crab.m2" },
-
-    -- ==============================
-    -- CROCOLISKS
-    -- ==============================
-    { "Crocolisk (Green)",     "Crocolisk",    540,   "Creature\\Crocolisk\\Crocolisk.m2" },
-    { "Crocolisk (Black)",     "Crocolisk",    5765,  "Creature\\Crocolisk\\Crocolisk.m2" },
-    { "Crocolisk (Red)",       "Crocolisk",    3231,  "Creature\\Crocolisk\\Crocolisk.m2" },  -- Fixed: was 3230 (invalid)
-    { "Outland Crocolisk",     "Crocolisk",    20513, "Creature\\Crocolisk\\Crocolisk.m2" },
-    { "Sewer Crocolisk",       "Crocolisk",    26353, "Creature\\Crocolisk\\Crocolisk.m2" },
-    { "Crocolisk (White)",     "Crocolisk",    26089, "Creature\\Crocolisk\\Crocolisk.m2" },
-
-    -- ==============================
-    -- GORILLAS
-    -- ==============================
-    { "Gorilla (Gray)",        "Gorilla",      2577,  "Creature\\Gorilla\\Gorilla.m2" },  -- Fixed: was 2578 (invalid)
-    { "Gorilla (White)",       "Gorilla",      2580,  "Creature\\Gorilla\\Gorilla.m2" },  -- Fixed: was 2579 (invalid)
-    { "Gorilla (Black)",       "Gorilla",      7093,  "Creature\\Gorilla\\Gorilla.m2" },
-    { "Un'Goro Gorilla",       "Gorilla",      8214,  "Creature\\Gorilla\\Gorilla.m2" },  -- Fixed: was 8213 (invalid)
-    { "Uhk'loc",	"Gorilla",	8129,  "Creature\\Gorilla\\Gorilla.m2" },
-
-    -- ==============================
-    -- HYENAS
-    -- ==============================
-    { "Hyena (Brown)",         "Hyena",        1045,  "Creature\\Hyena\\Hyena.m2" },  -- Fixed: was 1044 (invalid)
-    { "Hyena (Striped)",       "Hyena",        2697,  "Creature\\Hyena\\Hyena.m2" },  -- Fixed: was 2696 (invalid)
-    { "Hyena (Black)",         "Hyena",        4654,  "Creature\\Hyena\\Hyena.m2" },  -- Fixed: was 4653 (invalid)
-    { "Dire Hyena",            "Hyena",        7133,  "Creature\\Hyena\\Hyena.m2" },
-
-    -- ==============================
-    -- RAPTORS
-    -- ==============================
-    { "Raptor (Red)",          "Raptor",       3407,  "Creature\\Raptor\\Raptor.m2" },
-    { "Raptor (Green)",        "Raptor",       1130,  "Creature\\Raptor\\Raptor.m2" },  -- Fixed: was 1129 (invalid)
-    { "Raptor (Purple)",       "Raptor",       3143,  "Creature\\Raptor\\Raptor.m2" },
-    { "Raptor (White)",        "Raptor",       6643,  "Creature\\Raptor\\Raptor.m2" },  -- Fixed: was 6642 (invalid)
-    { "Raptor (Black)",        "Raptor",       2577,  "Creature\\Raptor\\Raptor.m2" },  -- Fixed: was 2576 (invalid)
-    { "Raptor (Orange)",       "Raptor",       14544, "Creature\\Raptor\\Raptor.m2" },
-    { "Outland Raptor",	"Raptor",	19732, "Creature\\Raptor\\Raptor.m2" },
-
-    -- ==============================
-    -- SCORPIDS
-    -- ==============================
-    { "Scorpid (Brown)",       "Scorpid",      1266,  "Creature\\Scorpid\\Scorpid.m2" },  -- Fixed: was 1265 (invalid)
-    { "Scorpid (Black)",       "Scorpid",      3127,  "Creature\\Scorpid\\Scorpid.m2" },  -- Fixed: was 3126 (invalid)
-    { "Scorpid (Red)",         "Scorpid",      2545,  "Creature\\Scorpid\\Scorpid.m2" },  -- Fixed: was 2544 (invalid)
-    { "Scorpid (White)",       "Scorpid",      7140,  "Creature\\Scorpid\\Scorpid.m2" },  -- Fixed: was 7139 (invalid)
-    { "Outland Scorpid",       "Scorpid",      20339, "Creature\\Scorpid\\Scorpid.m2" },
-
-    -- ==============================
-    -- SERPENTS (Wind Serpents)
-    -- ==============================
-    { "Wind Serpent (Green)",   "Serpent",      2954,  "Creature\\WindSerpent\\WindSerpent.m2" },
-    { "Wind Serpent (Blue)",    "Serpent",      2953,  "Creature\\WindSerpent\\WindSerpent.m2" },
-    { "Wind Serpent (Red)",     "Serpent",      4381,  "Creature\\WindSerpent\\WindSerpent.m2" },
-    { "Wind Serpent (Yellow)",  "Serpent",      5329,  "Creature\\WindSerpent\\WindSerpent.m2" },  -- Fixed: was 5328 (invalid)
-    { "Wind Serpent (White)",   "Serpent",      7094,  "Creature\\WindSerpent\\WindSerpent.m2" },
-    { "Outland Wind Serpent",   "Serpent",      20111, "Creature\\WindSerpent\\WindSerpent.m2" },
+    { "Cat (Lionessskingold)", "Cat", 1933, "Creature\\Lion\\Lion.m2" },
+    { "Cat (Lionskinblack)", "Cat", 4424, "Creature\\Lion\\Lion.m2" },
+    { "Cat (Lionskingold)", "Cat", 1977, "Creature\\Lion\\Lion.m2" },
+    { "Cat (Lionskinwhite)", "Cat", 1934, "Creature\\Lion\\Lion.m2" },
+    { "Cat (Lynxskinred)", "Cat", 15507, "Creature\\Lynx\\Lynx.m2" },
+    { "Cat (Lynxskinyellow)", "Cat", 18167, "Creature\\Lynx\\Lynx.m2" },
+    { "Cat (Tigerskinaqua)", "Cat", 10054, "Creature\\Tiger\\Tiger.m2" },
+    { "Cat (Tigerskinlavender)", "Cat", 9954, "Creature\\Tiger\\Tiger.m2" },
+    { "Cat (Tigerskinyellownosaddle)", "Cat", 25005, "Creature\\Tiger\\Tiger.m2" },
+    { "Cat (Tigerskinblack)", "Cat", 2437, "Creature\\Tiger\\Tiger.m2" },
+    { "Cat (Tigerskinblackgem)", "Cat", 19607, "Creature\\Tiger\\Tiger.m2" },
+    { "Cat (Tigerskinblackspotted)", "Cat", 18416, "Creature\\Tiger\\Tiger.m2" },
+    { "Cat (Tigerskinblackstriped)", "Cat", 321, "Creature\\Tiger\\Tiger.m2" },
+    { "Cat (Tigerskinbrown)", "Cat", 1059, "Creature\\Tiger\\Tiger.m2" },
+    { "Cat (Tigerskindark)", "Cat", 11454, "Creature\\Tiger\\Tiger.m2" },
+    { "Cat (Tigerskinnostripewhite)", "Cat", 9958, "Creature\\Tiger\\Tiger.m2" },
+    { "Cat (Tigerskinred)", "Cat", 598, "Creature\\Tiger\\Tiger.m2" },
+    { "Cat (Tigerskinsnow)", "Cat", 748, "Creature\\Tiger\\Tiger.m2" },
+    { "Cat (Tigerskinwhite)", "Cat", 616, "Creature\\Tiger\\Tiger.m2" },
+    { "Cat (Tigerskinyellow)", "Cat", 632, "Creature\\Tiger\\Tiger.m2" },
 
     -- ==============================
     -- SPIDERS
     -- ==============================
-    { "Spider (Black)",        "Spider",       1106,  "Creature\\Spider\\Spider.m2" },  -- Fixed: was 1107 (invalid)
-    { "Spider (Red)",          "Spider",       1105,  "Creature\\Spider\\Spider.m2" },
-    { "Spider (Green)",        "Spider",       1108,  "Creature\\Spider\\Spider.m2" },
-    { "Spider (Brown)",        "Spider",       3251,  "Creature\\Spider\\Spider.m2" },
-    { "Spider (Gray)",         "Spider",       4406,  "Creature\\Spider\\Spider.m2" },
-    { "Outland Spider",        "Spider",       20145, "Creature\\Spider\\Spider.m2" },
-    { "Nerubian Spider",       "Spider",       25574, "Creature\\NerubianAbomination\\NerubianAbomination.m2" },
+    { "Spider (Bonespider_grey)", "Spider", 26774, "Creature\\Spider\\Spider.m2" },
+    { "Spider (Giantspider)", "Spider", 17346, "Creature\\Spider\\Spider.m2" },
+    { "Spider (Giantspiderblack)", "Spider", 17180, "Creature\\Spider\\Spider.m2" },
+    { "Spider (Giantspiderorange)", "Spider", 18043, "Creature\\Spider\\Spider.m2" },
+    { "Spider (Minespiderskinblood)", "Spider", 963, "Creature\\Spider\\Spider.m2" },
+    { "Spider (Minespiderskincave)", "Spider", 955, "Creature\\Spider\\Spider.m2" },
+    { "Spider (Minespiderskincrystal)", "Spider", 4456, "Creature\\Spider\\Spider.m2" },
+    { "Spider (Minespiderskingreen)", "Spider", 2541, "Creature\\Spider\\Spider.m2" },
+    { "Spider (Minespiderskinjungle)", "Spider", 2536, "Creature\\Spider\\Spider.m2" },
+    { "Spider (Minespiderskinolive)", "Spider", 513, "Creature\\Spider\\Spider.m2" },
+    { "Spider (Minespiderskinsteel)", "Spider", 368, "Creature\\Spider\\Spider.m2" },
+    { "Spider (Minespiderskinviolet)", "Spider", 15937, "Creature\\Spider\\Spider.m2" },
+    { "Spider (Minespiderskinwetlands)", "Spider", 711, "Creature\\Spider\\Spider.m2" },
+    { "Spider (Tarantulaskinbrown)", "Spider", 520, "Creature\\Spider\\Spider.m2" },
+    { "Spider (Tarantulaskingreen)", "Spider", 336, "Creature\\Spider\\Spider.m2" },
+    { "Spider (Tarantulaskingrey)", "Spider", 1091, "Creature\\Spider\\Spider.m2" },
+    { "Spider (Tarantulaskinmagma)", "Spider", 4457, "Creature\\Spider\\Spider.m2" },
+    { "Spider (Tarantulaskinorange)", "Spider", 382, "Creature\\Spider\\Spider.m2" },
+
+    -- ==============================
+    -- BEARS
+    -- ==============================
+    { "Bear (Black)", "Bear", 8843, "Creature\\Bear\\Bear.m2" },
+    { "Bear (Blackdiseased)", "Bear", 1082, "Creature\\Bear\\Bear.m2" },
+    { "Bear (Blue)", "Bear", 8840, "Creature\\Bear\\Bear.m2" },
+    { "Bear (Brown)", "Bear", 1006, "Creature\\Bear\\Bear.m2" },
+    { "Bear (Drkbrown)", "Bear", 820, "Creature\\Bear\\Bear.m2" },
+    { "Bear (Drkbrowndiseased)", "Bear", 1083, "Creature\\Bear\\Bear.m2" },
+    { "Bear (White)", "Bear", 913, "Creature\\Bear\\Bear.m2" },
+    { "Bear (Whitediseased)", "Bear", 23966, "Creature\\Bear\\Bear.m2" },
+
+    -- ==============================
+    -- BOARS
+    -- ==============================
+    { "Boar (Blue)", "Boar", 381, "Creature\\Boar\\Boar.m2" },
+    { "Boar (Bluearmored)", "Boar", 4714, "Creature\\Boar\\Boar.m2" },
+    { "Boar (Brown)", "Boar", 703, "Creature\\Boar\\Boar.m2" },
+    { "Boar (Brownarmored)", "Boar", 4713, "Creature\\Boar\\Boar.m2" },
+    { "Boar (Crimson)", "Boar", 3027, "Creature\\Boar\\Boar.m2" },
+    { "Boar (Ivory)", "Boar", 503, "Creature\\Boar\\Boar.m2" },
+    { "Boar (Ivoryarmored)", "Boar", 2453, "Creature\\Boar\\Boar.m2" },
+    { "Boar (Undead)", "Boar", 6121, "Creature\\Boar\\Boar.m2" },
+    { "Boar (Yellow)", "Boar", 8871, "Creature\\Boar\\Boar.m2" },
+
+    -- ==============================
+    -- CROCOLISKS
+    -- ==============================
+    { "Crocolisk (Crocodileskinalbino)", "Crocolisk", 2850, "Creature\\Crocolisk\\Crocolisk.m2" },
+    { "Crocolisk (Crocodileskinmarsh)", "Crocolisk", 2548, "Creature\\Crocolisk\\Crocolisk.m2" },
+    { "Crocolisk (Crocodileskinriver)", "Crocolisk", 1039, "Creature\\Crocolisk\\Crocolisk.m2" },
+    { "Crocolisk (Crocodileskinswamp)", "Crocolisk", 807, "Creature\\Crocolisk\\Crocolisk.m2" },
+
+    -- ==============================
+    -- CARRION BIRDS
+    -- ==============================
+    { "Carrion Bird (Arcticcondorblue)", "Carrion Bird", 23962, "Creature\\Vulture\\Vulture.m2" },
+    { "Carrion Bird (Arcticcondorwhite)", "Carrion Bird", 23483, "Creature\\Vulture\\Vulture.m2" },
+    { "Carrion Bird (Carrionbirdskin)", "Carrion Bird", 1105, "Creature\\Vulture\\Vulture.m2" },
+    { "Carrion Bird (Carrionbirdskinblue)", "Carrion Bird", 507, "Creature\\Vulture\\Vulture.m2" },
+    { "Carrion Bird (Carrionbirdskinbrown)", "Carrion Bird", 410, "Creature\\Vulture\\Vulture.m2" },
+    { "Carrion Bird (Carrionbirdskinoutland)", "Carrion Bird", 16880, "Creature\\Vulture\\Vulture.m2" },
+    { "Carrion Bird (Carrionbirdskinoutlandwhite)", "Carrion Bird", 20348, "Creature\\Vulture\\Vulture.m2" },
+    { "Carrion Bird (Carrionbirdskinred)", "Carrion Bird", 490, "Creature\\Vulture\\Vulture.m2" },
+    { "Carrion Bird (Owlarrokoagreen)", "Carrion Bird", 21003, "Creature\\Vulture\\Vulture.m2" },
+    { "Carrion Bird (Stormcrowdruidskin)", "Carrion Bird", 20857, "Creature\\Vulture\\Vulture.m2" },
+    { "Carrion Bird (Stormcrowskin)", "Carrion Bird", 20013, "Creature\\Vulture\\Vulture.m2" },
+
+    -- ==============================
+    -- CRABS
+    -- ==============================
+    { "Crab (Bronze)", "Crab", 342, "Creature\\Crab\\Crab.m2" },
+    { "Crab (Ivory)", "Crab", 999, "Creature\\Crab\\Crab.m2" },
+    { "Crab (Saphire)", "Crab", 979, "Creature\\Crab\\Crab.m2" },
+    { "Crab (Vermillian)", "Crab", 1307, "Creature\\Crab\\Crab.m2" },
+
+    -- ==============================
+    -- GORILLAS
+    -- ==============================
+    { "Gorilla (Black)", "Gorilla", 845, "Creature\\Gorilla\\Gorilla.m2" },
+    { "Gorilla (Grey)", "Gorilla", 843, "Creature\\Gorilla\\Gorilla.m2" },
+    { "Gorilla (Red)", "Gorilla", 3186, "Creature\\Gorilla\\Gorilla.m2" },
+    { "Gorilla (Silver)", "Gorilla", 837, "Creature\\Gorilla\\Gorilla.m2" },
+    { "Gorilla (White)", "Gorilla", 8129, "Creature\\Gorilla\\Gorilla.m2" },
+
+    -- ==============================
+    -- RAPTORS
+    -- ==============================
+    { "Raptor (Raptor_outlandblack)", "Raptor", 20093, "Creature\\Raptor\\Raptor.m2" },
+    { "Raptor (Raptor_outlandgreen)", "Raptor", 19742, "Creature\\Raptor\\Raptor.m2" },
+    { "Raptor (Raptor_outlandred)", "Raptor", 19735, "Creature\\Raptor\\Raptor.m2" },
+    { "Raptor (Raptor_outlandyellow)", "Raptor", 19758, "Creature\\Raptor\\Raptor.m2" },
+    { "Raptor (Grey)", "Raptor", 1746, "Creature\\Raptor\\Raptor.m2" },
+    { "Raptor (Mottledbluegreen)", "Raptor", 8472, "Creature\\Raptor\\Raptor.m2" },
+    { "Raptor (Mottleddarkgreen)", "Raptor", 615, "Creature\\Raptor\\Raptor.m2" },
+    { "Raptor (Orange)", "Raptor", 788, "Creature\\Raptor\\Raptor.m2" },
+    { "Raptor (Red)", "Raptor", 2571, "Creature\\Raptor\\Raptor.m2" },
+    { "Raptor (Violet)", "Raptor", 11317, "Creature\\Raptor\\Raptor.m2" },
+    { "Raptor (Yellow)", "Raptor", 11316, "Creature\\Raptor\\Raptor.m2" },
+    { "Raptor (Raptorskinobsidian)", "Raptor", 5291, "Creature\\Raptor\\Raptor.m2" },
 
     -- ==============================
     -- TALLSTRIDERS
     -- ==============================
-    { "Tallstrider (Gray)",    "Tallstrider",  1379,  "Creature\\Tallstrider\\Tallstrider.m2" },
-    { "Tallstrider (Turquoise)",	"Tallstrider",	6478,  "Creature\\Tallstrider\\Tallstrider.m2" },
-    { "Tallstrider (Pink)",	"Tallstrider",	6476,  "Creature\\Tallstrider\\Tallstrider.m2" },
-    { "Tallstrider (Green)",   "Tallstrider",  3011,  "Creature\\Tallstrider\\Tallstrider.m2" },
-    { "Tallstrider (Red)",     "Tallstrider",  3562,  "Creature\\Tallstrider\\Tallstrider.m2" },  -- Fixed: was 3561 (invalid)
+    { "Tallstrider (Brown)", "Tallstrider", 1042, "Creature\\Tallstrider\\Tallstrider.m2" },
+    { "Tallstrider (Gray)", "Tallstrider", 1220, "Creature\\Tallstrider\\Tallstrider.m2" },
+    { "Tallstrider (Ivory)", "Tallstrider", 1221, "Creature\\Tallstrider\\Tallstrider.m2" },
+    { "Tallstrider (Pink)", "Tallstrider", 1961, "Creature\\Tallstrider\\Tallstrider.m2" },
+    { "Tallstrider (Purple)", "Tallstrider", 21268, "Creature\\Tallstrider\\Tallstrider.m2" },
+    { "Tallstrider (Turquoise)", "Tallstrider", 38, "Creature\\Tallstrider\\Tallstrider.m2" },
+
+    -- ==============================
+    -- SCORPIDS
+    -- ==============================
+    { "Scorpid (Scorpionskinbeige)", "Scorpid", 2485, "Creature\\Scorpid\\Scorpid.m2" },
+    { "Scorpid (Scorpionskinblack)", "Scorpid", 2488, "Creature\\Scorpid\\Scorpid.m2" },
+    { "Scorpid (Scorpionskinblue)", "Scorpid", 2730, "Creature\\Scorpid\\Scorpid.m2" },
+    { "Scorpid (Scorpionskingolden)", "Scorpid", 2729, "Creature\\Scorpid\\Scorpid.m2" },
+    { "Scorpid (Scorpionskinpink)", "Scorpid", 2414, "Creature\\Scorpid\\Scorpid.m2" },
+    { "Scorpid (Scorpionskinred)", "Scorpid", 3247, "Creature\\Scorpid\\Scorpid.m2" },
+    { "Scorpid (Scorpionskinsilver)", "Scorpid", 10988, "Creature\\Scorpid\\Scorpid.m2" },
+    { "Scorpid (Scorpionskinyellow)", "Scorpid", 2487, "Creature\\Scorpid\\Scorpid.m2" },
 
     -- ==============================
     -- TURTLES
     -- ==============================
-    { "Turtle (Green)",        "Turtle",       1425,  "Creature\\Turtle\\Turtle.m2" },  -- Fixed: was 1424 (invalid)
-    { "Turtle (Brown)",        "Turtle",       4723,  "Creature\\Turtle\\Turtle.m2" },  -- Fixed: was 4722 (invalid)
-    { "Turtle (Red)",          "Turtle",       7094,  "Creature\\Turtle\\Turtle.m2" },
-    { "Turtle (Blue)",         "Turtle",       2424,  "Creature\\Turtle\\Turtle.m2" },
-    { "Outland Turtle",        "Turtle",       20157, "Creature\\Turtle\\Turtle.m2" },  -- Fixed: was 20156 (invalid)
-
-    -- ==============================
-    -- WOLVES
-    -- ==============================
-    { "Wolf (Gray)",           "Wolf",         604,   "Creature\\Wolf\\Wolf.m2" },
-    { "Wolf (Black)",          "Wolf",         2956,  "Creature\\Wolf\\Wolf.m2" },
-    { "Wolf (White)",          "Wolf",         610,   "Creature\\Wolf\\Wolf.m2" },  -- Fixed: was 611 (invalid)
-    { "Wolf (Brown)",          "Wolf",         1138,  "Creature\\Wolf\\Wolf.m2" },  -- Fixed: was 1137 (invalid)
-    { "Wolf (Timber)",         "Wolf",         12256, "Creature\\Wolf\\Wolf.m2" },  -- Fixed: was 12255 (invalid)
-    { "Worg (Dark Iron)",      "Wolf",         903,   "Creature\\Worg\\Worg.m2" },
-    { "Worg (Black)",          "Wolf",         1826,  "Creature\\Worg\\Worg.m2" },
-    { "Worg (White)",          "Wolf",         26071, "Creature\\Worg\\Worg.m2" },
-    { "Worg (Gray)",           "Wolf",         26061, "Creature\\Worg\\Worg.m2" },
-    { "Dire Wolf",             "Wolf",         2577,  "Creature\\Wolf\\Wolf.m2" },
-    { "Ghost Wolf",            "Wolf",         10981, "Creature\\Wolf\\Wolf.m2" },
-
-    -- ==============================
-    -- OWLS (Bird of Prey in Classic, merged with Birds of Prey in TBC)
-    -- ==============================
-    { "Owl (Brown)",           "Owl",          1563,  "Creature\\Owl\\Owl.m2" },
-    { "Owl (Gray)",            "Owl",          7895,  "Creature\\Owl\\Owl.m2" },
-    { "Owl (White)",           "Owl",          7898,  "Creature\\Owl\\Owl.m2" },
-    { "Owl (Dark)",            "Owl",          14372, "Creature\\Owl\\Owl.m2" },
-
-    -- ==============================
-    -- BIRDS OF PREY (Hawks, Eagles — TBC+)
-    -- ==============================
-    { "Hawk (Brown)",          "Bird of Prey", 18851, "Creature\\Eagle\\Eagle.m2" },
-    { "Eagle (White)",         "Bird of Prey", 18852, "Creature\\Eagle\\Eagle.m2" },
-    { "Eagle (Black)",         "Bird of Prey", 18854, "Creature\\Eagle\\Eagle.m2" },
-    { "Falcon (Red)",          "Bird of Prey", 24083, "Creature\\Eagle\\Eagle.m2" },
-    { "Aotona (Exotic Bird)",  "Bird of Prey", 27419, "Creature\\Eagle\\Eagle.m2" },
+    { "Turtle (Seaturtleskin)", "Turtle", 1244, "Creature\\Turtle\\Turtle.m2" },
+    { "Turtle (Seaturtleskinblue)", "Turtle", 6368, "Creature\\Turtle\\Turtle.m2" },
+    { "Turtle (Seaturtleskingrey)", "Turtle", 4829, "Creature\\Turtle\\Turtle.m2" },
+    { "Turtle (Seaturtleskinred)", "Turtle", 5027, "Creature\\Turtle\\Turtle.m2" },
+    { "Turtle (Seaturtleskinwhite)", "Turtle", 5052, "Creature\\Turtle\\Turtle.m2" },
 
     -- ==============================
     -- BATS
     -- ==============================
-    { "Bat (Gray)",            "Bat",          2129,  "Creature\\Bat\\Bat.m2" },
-    { "Bat (Brown)",           "Bat",          10718, "Creature\\Bat\\Bat.m2" },  -- Fixed: was 10717 (invalid)
-    { "Bat (White)",           "Bat",          26081, "Creature\\Bat\\Bat.m2" },
-    { "Plagued Bat",           "Bat",          26014, "Creature\\Bat\\Bat.m2" },  -- Fixed: was 26013 (invalid)
-    { "Vampire Bat",           "Bat",          14544, "Creature\\Bat\\Bat.m2" },
+    { "Bat (01)", "Bat", 1955, "Creature\\Bat\\Bat.m2" },
+    { "Bat (Brown01)", "Bat", 4732, "Creature\\Bat\\Bat.m2" },
+    { "Bat (Violet01)", "Bat", 8808, "Creature\\Bat\\Bat.m2" },
+    { "Bat (White01)", "Bat", 4735, "Creature\\Bat\\Bat.m2" },
 
     -- ==============================
-    -- CARRION BIRDS (Vultures, Buzzards)
+    -- HYENAS
     -- ==============================
-    { "Vulture (Brown)",       "Carrion Bird", 1194,  "Creature\\Vulture\\Vulture.m2" },
-    { "Vulture (Black)",       "Carrion Bird", 4235,  "Creature\\Vulture\\Vulture.m2" },
-    { "Vulture (Red)",         "Carrion Bird", 4714,  "Creature\\Vulture\\Vulture.m2" },
-    { "Carrion Bird (Bone)",   "Carrion Bird", 26074, "Creature\\Vulture\\Vulture.m2" },  -- Fixed: was 26073 (invalid)
-    { "Outland Carrion Bird",  "Carrion Bird", 20365, "Creature\\Vulture\\Vulture.m2" },
+    { "Hyena (Default)", "Hyena", 1536, "Creature\\Hyena\\Hyena.m2" },
+    { "Hyena (Black)", "Hyena", 2726, "Creature\\Hyena\\Hyena.m2" },
+    { "Hyena (Blue)", "Hyena", 2713, "Creature\\Hyena\\Hyena.m2" },
+    { "Hyena (Oarnge)", "Hyena", 1535, "Creature\\Hyena\\Hyena.m2" },
+    { "Hyena (Red)", "Hyena", 2709, "Creature\\Hyena\\Hyena.m2" },
+    { "Hyena (White)", "Hyena", 2716, "Creature\\Hyena\\Hyena.m2" },
+    { "Hyena (Yellow)", "Hyena", 2710, "Creature\\Hyena\\Hyena.m2" },
 
     -- ==============================
-    -- DRAGONHAWKS (TBC+)
+    -- BIRD OF PREYS
     -- ==============================
-    { "Dragonhawk (Red)",      "Dragonhawk",  20031, "Creature\\DragonHawk\\DragonHawk.m2" },
-    { "Dragonhawk (Blue)",     "Dragonhawk",  20029, "Creature\\DragonHawk\\DragonHawk.m2" },  -- Fixed: was 20035 (invalid)
-    { "Dragonhawk (Yellow)",   "Dragonhawk",  20026, "Creature\\DragonHawk\\DragonHawk.m2" },  -- Fixed: was 20032 (invalid)
-    { "Dragonhawk (Purple)",   "Dragonhawk",  20033, "Creature\\DragonHawk\\DragonHawk.m2" },
-    { "Dragonhawk (Green)",    "Dragonhawk",  20028, "Creature\\DragonHawk\\DragonHawk.m2" },  -- Fixed: was 20034 (invalid)
-    { "Dragonhawk (White)",    "Dragonhawk",  20037, "Creature\\DragonHawk\\DragonHawk.m2" },  -- Fixed: was 20036 (invalid)
+    { "Bird of Prey (Browneagle)", "Bird of Prey", 22321, "Creature\\Eagle\\Eagle.m2" },
+    { "Bird of Prey (Carrionbirdskinoutlandblue)", "Bird of Prey", 20300, "Creature\\Eagle\\Eagle.m2" },
+    { "Bird of Prey (Eagle)", "Bird of Prey", 22106, "Creature\\Eagle\\Eagle.m2" },
+    { "Bird of Prey (Owlarrokoagreen)", "Bird of Prey", 20725, "Creature\\Eagle\\Eagle.m2" },
+    { "Bird of Prey (Owlarrokoapurple)", "Bird of Prey", 20738, "Creature\\Eagle\\Eagle.m2" },
+    { "Bird of Prey (Owlarrokoared)", "Bird of Prey", 20730, "Creature\\Eagle\\Eagle.m2" },
+    { "Bird of Prey (Owlblack)", "Bird of Prey", 6299, "Creature\\Eagle\\Eagle.m2" },
+    { "Bird of Prey (Owlbrown)", "Bird of Prey", 4615, "Creature\\Eagle\\Eagle.m2" },
+    { "Bird of Prey (Owlgrey)", "Bird of Prey", 10832, "Creature\\Eagle\\Eagle.m2" },
+    { "Bird of Prey (Owljade)", "Bird of Prey", 24453, "Creature\\Eagle\\Eagle.m2" },
+    { "Bird of Prey (Owlwhite)", "Bird of Prey", 6212, "Creature\\Eagle\\Eagle.m2" },
+    { "Bird of Prey (Parrotskinblue)", "Bird of Prey", 27975, "Creature\\Eagle\\Eagle.m2" },
+    { "Bird of Prey (Snowyeagle)", "Bird of Prey", 25925, "Creature\\Eagle\\Eagle.m2" },
+    { "Bird of Prey (Stormcrowdruidskin_brown)", "Bird of Prey", 22633, "Creature\\Eagle\\Eagle.m2" },
 
     -- ==============================
-    -- NETHER RAYS (TBC+)
+    -- SERPENTS
     -- ==============================
-    { "Nether Ray (Purple)",   "Nether Ray",  21500, "Creature\\NetherRay\\NetherRay.m2" },
-    { "Nether Ray (Red)",      "Nether Ray",  21496, "Creature\\NetherRay\\NetherRay.m2" },  -- Fixed: was 21497 (invalid)
-    { "Nether Ray (Blue)",     "Nether Ray",  21501, "Creature\\NetherRay\\NetherRay.m2" },
-    { "Nether Ray (Green)",    "Nether Ray",  21499, "Creature\\NetherRay\\NetherRay.m2" },  -- Fixed: was 21498 (invalid)
-    { "Nether Ray (Silver)",   "Nether Ray",  21503, "Creature\\NetherRay\\NetherRay.m2" },
+    { "Serpent (Windserpentskin)", "Serpent", 1742, "Creature\\WindSerpent\\WindSerpent.m2" },
+    { "Serpent (Windserpentskinblack)", "Serpent", 3006, "Creature\\WindSerpent\\WindSerpent.m2" },
+    { "Serpent (Windserpentskingreen)", "Serpent", 4091, "Creature\\WindSerpent\\WindSerpent.m2" },
+    { "Serpent (Windserpentskinoarnge)", "Serpent", 19793, "Creature\\WindSerpent\\WindSerpent.m2" },
+    { "Serpent (Windserpentskinoutland)", "Serpent", 20838, "Creature\\WindSerpent\\WindSerpent.m2" },
+    { "Serpent (Windserpentskinoutland3)", "Serpent", 20094, "Creature\\WindSerpent\\WindSerpent.m2" },
+    { "Serpent (Windserpentskinoutland4)", "Serpent", 19788, "Creature\\WindSerpent\\WindSerpent.m2" },
+    { "Serpent (Windserpentskinoutland5)", "Serpent", 25460, "Creature\\WindSerpent\\WindSerpent.m2" },
+    { "Serpent (Windserpentskinred)", "Serpent", 2699, "Creature\\WindSerpent\\WindSerpent.m2" },
+    { "Serpent (Windserpentskinwhite)", "Serpent", 2705, "Creature\\WindSerpent\\WindSerpent.m2" },
 
     -- ==============================
-    -- RAVAGERS (TBC+)
+    -- DRAGONHAWKS
     -- ==============================
-    { "Ravager (Red)",         "Ravager",      17378, "Creature\\Ravager\\Ravager.m2" },  -- Fixed: was 17377 (invalid)
-    { "Ravager (Orange)",      "Ravager",      20063, "Creature\\Ravager\\Ravager.m2" },
-    { "Ravager (Green)",       "Ravager",      20064, "Creature\\Ravager\\Ravager.m2" },
-    { "Ravager (White)",       "Ravager",      20066, "Creature\\Ravager\\Ravager.m2" },  -- Fixed: was 20065 (invalid)
-    { "Ravager (Blue)",        "Ravager",      20062, "Creature\\Ravager\\Ravager.m2" },
+    { "Dragonhawk (Default)", "Dragonhawk", 17547, "Creature\\DragonHawk\\DragonHawk.m2" },
+    { "Dragonhawk (01)", "Dragonhawk", 17545, "Creature\\DragonHawk\\DragonHawk.m2" },
+    { "Dragonhawk (03)", "Dragonhawk", 19299, "Creature\\DragonHawk\\DragonHawk.m2" },
+    { "Dragonhawk (05)", "Dragonhawk", 19685, "Creature\\DragonHawk\\DragonHawk.m2" },
 
     -- ==============================
-    -- SPOREBATS (TBC+)
+    -- RAVAGERS
     -- ==============================
-    { "Sporebat (Purple)",     "Sporebat",     17831, "Creature\\Sporebat\\Sporebat.m2" },
-    { "Sporebat (Red)",        "Sporebat",     20377, "Creature\\Sporebat\\Sporebat.m2" },  -- Fixed: was 20378 (invalid)
-    { "Sporebat (Blue)",       "Sporebat",     20376, "Creature\\Sporebat\\Sporebat.m2" },  -- Fixed: was 20379 (invalid)
-    { "Sporebat (Yellow)",     "Sporebat",     20381, "Creature\\Sporebat\\Sporebat.m2" },  -- Fixed: was 20380 (invalid)
-    { "Sporebat (White)",      "Sporebat",     20383, "Creature\\Sporebat\\Sporebat.m2" },  -- Fixed: was 20382 (invalid)
+    { "Ravager (Crawlerelite_green)", "Ravager", 20297, "Creature\\Ravager\\Ravager.m2" },
+    { "Ravager (Crawlerelite_orange)", "Ravager", 20309, "Creature\\Ravager\\Ravager.m2" },
+    { "Ravager (Crawlerelite_purple)", "Ravager", 20308, "Creature\\Ravager\\Ravager.m2" },
+    { "Ravager (Crawlergreen)", "Ravager", 17061, "Creature\\Ravager\\Ravager.m2" },
+    { "Ravager (Crawlerorange)", "Ravager", 16887, "Creature\\Ravager\\Ravager.m2" },
+    { "Ravager (Crawlerpurple)", "Ravager", 17086, "Creature\\Ravager\\Ravager.m2" },
+    { "Ravager (Crawlervar1)", "Ravager", 19844, "Creature\\Ravager\\Ravager.m2" },
+    { "Ravager (Crawlervar5)", "Ravager", 20062, "Creature\\Ravager\\Ravager.m2" },
+    { "Ravager (Crawlervar8)", "Ravager", 20063, "Creature\\Ravager\\Ravager.m2" },
 
     -- ==============================
-    -- WARP STALKERS (TBC+)
+    -- WARP STALKERS
     -- ==============================
-    { "Warp Stalker (Green)",  "Warp Stalker", 20122, "Creature\\WarpStalker\\WarpStalker.m2" },
-    { "Warp Stalker (Red)",    "Warp Stalker", 20123, "Creature\\WarpStalker\\WarpStalker.m2" },
-    { "Warp Stalker (Blue)",   "Warp Stalker", 20124, "Creature\\WarpStalker\\WarpStalker.m2" },
-    { "Warp Stalker (White)",  "Warp Stalker", 20126, "Creature\\WarpStalker\\WarpStalker.m2" },
-    { "Warp Stalker (Purple)", "Warp Stalker", 20125, "Creature\\WarpStalker\\WarpStalker.m2" },
+    { "Warp Stalker (Warpstalkerskinblack)", "Warp Stalker", 19996, "Creature\\WarpStalker\\WarpStalker.m2" },
+    { "Warp Stalker (Warpstalkerskinblue)", "Warp Stalker", 18719, "Creature\\WarpStalker\\WarpStalker.m2" },
+    { "Warp Stalker (Warpstalkerskingreen)", "Warp Stalker", 19369, "Creature\\WarpStalker\\WarpStalker.m2" },
+    { "Warp Stalker (Warpstalkerskinred)", "Warp Stalker", 20142, "Creature\\WarpStalker\\WarpStalker.m2" },
+    { "Warp Stalker (Warpstalkerskinturquiose)", "Warp Stalker", 19979, "Creature\\WarpStalker\\WarpStalker.m2" },
+    { "Warp Stalker (Warpstalkerskinwhite)", "Warp Stalker", 20025, "Creature\\WarpStalker\\WarpStalker.m2" },
 
     -- ==============================
-    -- MOTHS (TBC+)
+    -- SPOREBATS
     -- ==============================
-    { "Moth (White)",          "Moth",         20666, "Creature\\Moth\\Moth.m2" },  -- Fixed: was 20667 (invalid)
-    { "Moth (Yellow)",         "Moth",         19985, "Creature\\Moth\\Moth.m2" },  -- Fixed: was 20668 (invalid)
-    { "Moth (Blue)",           "Moth",         19987, "Creature\\Moth\\Moth.m2" },  -- Fixed: was 20669 (invalid)
-    { "Moth (Red)",            "Moth",         20670, "Creature\\Moth\\Moth.m2" },
-    { "Moth (Green)",          "Moth",         20671, "Creature\\Moth\\Moth.m2" },
+    { "Sporebat (Sporebatblue)", "Sporebat", 17751, "Creature\\Sporebat\\Sporebat.m2" },
+    { "Sporebat (Sporebatgreen)", "Sporebat", 17752, "Creature\\Sporebat\\Sporebat.m2" },
+    { "Sporebat (Sporebatyellow)", "Sporebat", 18029, "Creature\\Sporebat\\Sporebat.m2" },
 
     -- ==============================
-    -- WASPS (TBC+)
+    -- NETHER RAYS
     -- ==============================
-    { "Wasp (Yellow)",         "Wasp",         18284, "Creature\\Wasp\\Wasp.m2" },  -- Fixed: was 18283 (invalid)
-    { "Wasp (Red)",            "Wasp",         20585, "Creature\\Wasp\\Wasp.m2" },
-    { "Wasp (Blue)",           "Wasp",         20584, "Creature\\Wasp\\Wasp.m2" },
-    { "Wasp (Green)",          "Wasp",         20586, "Creature\\Wasp\\Wasp.m2" },
+    { "Nether Ray (Netherrayskinblack)", "Nether Ray", 19403, "Creature\\NetherRay\\NetherRay.m2" },
+    { "Nether Ray (Netherrayskinblue)", "Nether Ray", 19405, "Creature\\NetherRay\\NetherRay.m2" },
+    { "Nether Ray (Netherrayskingreen)", "Nether Ray", 19404, "Creature\\NetherRay\\NetherRay.m2" },
+    { "Nether Ray (Netherrayskinred)", "Nether Ray", 20596, "Creature\\NetherRay\\NetherRay.m2" },
+    { "Nether Ray (Netherwyrmskin)", "Nether Ray", 19401, "Creature\\NetherRay\\NetherRay.m2" },
 
     -- ==============================
-    -- SERPENTS (Snakes — not Wind Serpents)
+    -- SNAKES
     -- ==============================
-    { "Snake (Green)",         "Snake",        3415,  "Creature\\Snake\\Snake.m2" },
-    { "Snake (Brown)",         "Snake",        5165,  "Creature\\Snake\\Snake.m2" },
-    { "Snake (Black)",         "Snake",        6303,  "Creature\\Snake\\Snake.m2" },
-    { "Snake (Red)",           "Snake",        14544, "Creature\\Snake\\Snake.m2" },
-    { "Cobra",	"Snake",	4213, "Creature\\Cobra\\Cobra.m2" },
-    { "King Cobra",            "Snake",        20578, "Creature\\Cobra\\Cobra.m2" },
+    { "Snake (Serpantskinblue)", "Snake", 4317, "Creature\\Cobra\\Cobra.m2" },
+    { "Snake (Serpantskinbrown)", "Snake", 15182, "Creature\\Cobra\\Cobra.m2" },
+    { "Snake (Serpantskingreen)", "Snake", 4768, "Creature\\Cobra\\Cobra.m2" },
+    { "Snake (Serpantskinpurple)", "Snake", 4312, "Creature\\Cobra\\Cobra.m2" },
+    { "Snake (Serpantskinwhite)", "Snake", 4305, "Creature\\Cobra\\Cobra.m2" },
 
     -- ==============================
-    -- CHIMERAS (Exotic — BM only, WotLK)
+    -- MOTHS
     -- ==============================
-    { "Chimera (Blue)",        "Chimera",      25511, "Creature\\HydraMount\\HydraMount.m2" },
-    { "Chimera (Green)",       "Chimera",      26360, "Creature\\HydraMount\\HydraMount.m2" },
-    { "Chimera (Red)",         "Chimera",      26317, "Creature\\HydraMount\\HydraMount.m2" },  -- Fixed: was 26316 (invalid)
-    { "Chimera (White)",       "Chimera",      26361, "Creature\\HydraMount\\HydraMount.m2" },
-    { "Chimera (Purple)",      "Chimera",      26359, "Creature\\HydraMount\\HydraMount.m2" },
+    { "Moth (Beige)", "Moth", 17574, "Creature\\Moth\\Moth.m2" },
+    { "Moth (Blue)", "Moth", 17709, "Creature\\Moth\\Moth.m2" },
+    { "Moth (Red)", "Moth", 17795, "Creature\\Moth\\Moth.m2" },
+    { "Moth (White)", "Moth", 23237, "Creature\\Moth\\Moth.m2" },
+    { "Moth (Yellow)", "Moth", 17798, "Creature\\Moth\\Moth.m2" },
 
     -- ==============================
-    -- CORE HOUNDS (Exotic — BM only)
+    -- CHIMERAS
     -- ==============================
-    { "Core Hound (Orange)",   "Core Hound",   10813, "Creature\\CoreHound\\CoreHound.m2" },
-    { "Core Hound (Black)",    "Core Hound",   10957, "Creature\\CoreHound\\CoreHound.m2" },  -- Fixed: was 10956 (invalid)
-    { "Core Hound (Purple)",   "Core Hound",   27347, "Creature\\CoreHound\\CoreHound.m2" },
-    { "Core Hound (Kurken)",   "Core Hound",   18162, "Creature\\CoreHound\\CoreHound.m2" },
-    { "Magmadar",              "Core Hound",   10193, "Creature\\CoreHound\\CoreHound.m2" },
+    { "Chimera (01)", "Chimera", 8015, "Creature\\HydraMount\\HydraMount.m2" },
+    { "Chimera (Blue_01)", "Chimera", 10807, "Creature\\HydraMount\\HydraMount.m2" },
+    { "Chimera (Outlandgreen_01)", "Chimera", 17091, "Creature\\HydraMount\\HydraMount.m2" },
+    { "Chimera (Outlandpurple_01)", "Chimera", 19913, "Creature\\HydraMount\\HydraMount.m2" },
 
     -- ==============================
-    -- DEVILSAURS (Exotic — BM only)
+    -- DEVILSAURS
     -- ==============================
-    { "Devilsaur (Green)",     "Devilsaur",    7345,  "Creature\\Devilsaur\\Devilsaur.m2" },
-    { "Devilsaur (Black)",     "Devilsaur",    8029,  "Creature\\Devilsaur\\Devilsaur.m2" },
-    { "King Krush",            "Devilsaur",    26650, "Creature\\Devilsaur\\Devilsaur.m2" },
-    { "Devilsaur (White)",     "Devilsaur",    26649, "Creature\\Devilsaur\\Devilsaur.m2" },  -- Fixed: was 26648 (invalid)
+    { "Devilsaur (Trexskinblack)", "Devilsaur", 5238, "Creature\\Devilsaur\\Devilsaur.m2" },
+    { "Devilsaur (Trexskingreen)", "Devilsaur", 28052, "Creature\\Devilsaur\\Devilsaur.m2" },
+    { "Devilsaur (Trexskinred)", "Devilsaur", 5240, "Creature\\Devilsaur\\Devilsaur.m2" },
+    { "Devilsaur (Trexskinwhite)", "Devilsaur", 5239, "Creature\\Devilsaur\\Devilsaur.m2" },
 
     -- ==============================
-    -- SILITHIDS (Exotic — BM only)
+    -- SILITHIDS
     -- ==============================
-    { "Silithid (Green)",      "Silithid",     8311,  "Creature\\SilithidTank\\SilithidTank.m2" },
-    { "Silithid (Red)",        "Silithid",     8314,  "Creature\\SilithidTank\\SilithidTank.m2" },
-    { "Silithid (Blue)",       "Silithid",     8309,  "Creature\\SilithidTank\\SilithidTank.m2" },
-    { "Silithid (Black)",      "Silithid",     15123, "Creature\\SilithidTank\\SilithidTank.m2" },  -- Fixed: was 15122 (invalid)
+    { "Silithid (Silithidtankskinblue)", "Silithid", 3195, "Creature\\SilithidTank\\SilithidTank.m2" },
+    { "Silithid (Silithidtankskingolden)", "Silithid", 11087, "Creature\\SilithidTank\\SilithidTank.m2" },
+    { "Silithid (Silithidtankskintan)", "Silithid", 11099, "Creature\\SilithidTank\\SilithidTank.m2" },
+    { "Silithid (Silithidtankskinviolet)", "Silithid", 11079, "Creature\\SilithidTank\\SilithidTank.m2" },
 
     -- ==============================
-    -- SPIRIT BEASTS (Exotic — BM only, WotLK)
+    -- WORMS
     -- ==============================
-    { "Loque'nahak",           "Spirit Beast", 26349, "Creature\\SpiritBeast\\SpiritBeast.m2" },
-    { "Gondria",               "Spirit Beast", 29268, "Creature\\SpiritBeast\\SpiritBeast.m2" },
-    { "Skoll",                 "Spirit Beast", 29602, "Creature\\Worg\\Worg.m2" },
-    { "Arcturis",              "Spirit Beast", 29756, "Creature\\Bear2\\Bear2.m2" },
-
-    -- ==============================
-    -- WORMS (Exotic — BM only, WotLK)
-    -- ==============================
-    { "Jormungar (White)",     "Worm",         25600, "Creature\\Jormungar\\Jormungar.m2" },
-    { "Jormungar (Black)",     "Worm",         26292, "Creature\\Jormungar\\Jormungar.m2" },
-    { "Jormungar (Blue)",      "Worm",         26291, "Creature\\Jormungar\\Jormungar.m2" },
-    { "Jormungar (Purple)",    "Worm",         26290, "Creature\\Jormungar\\Jormungar.m2" },
-    { "Jormungar (Red)",       "Worm",         25601, "Creature\\Jormungar\\Jormungar.m2" },
-    { "Oozeling (Green)",      "Worm",         24584, "Creature\\Ooze\\Ooze.m2" },
-
-    -- ==============================
-    -- RHINOS (Exotic — BM only, WotLK)
-    -- ==============================
-    { "Rhino (Gray)",          "Rhino",        24758, "Creature\\Rhino\\Rhino.m2" },
-    { "Rhino (Brown)",         "Rhino",        25359, "Creature\\Rhino\\Rhino.m2" },  -- Fixed: was 25360 (invalid)
-    { "Rhino (White)",         "Rhino",        24759, "Creature\\Rhino\\Rhino.m2" },  -- Fixed: was 25361 (invalid)
-    { "Rhino (Black)",         "Rhino",        24760, "Creature\\Rhino\\Rhino.m2" },  -- Fixed: was 25362 (invalid)
-
-    -- ==============================
-    -- CROCOLISKS (Northrend)
-    -- ==============================
-    { "Mangal Crocolisk",      "Crocolisk",    26077, "Creature\\Crocolisk\\Crocolisk.m2" },
-
-    -- ==============================
-    -- GORILLAS (Northrend)
-    -- ==============================
-    { "Storm Peaks Gorilla",   "Gorilla",      26638, "Creature\\Gorilla\\Gorilla.m2" },
-
-    -- ==============================
-    -- WOLVES (Northrend)
-    -- ==============================
-    { "Northrend Worg (Brown)","Wolf",         26062, "Creature\\Worg\\Worg.m2" },
-    { "Northrend Worg (Red)",  "Wolf",         26063, "Creature\\Worg\\Worg.m2" },
-    { "Northrend Worg (Black)","Wolf",         26064, "Creature\\Worg\\Worg.m2" },
-    { "Northrend Wolf (Black)","Wolf",         26061, "Creature\\Wolf\\Wolf.m2" },  -- Fixed: was 26060 (invalid)
-    { "Northrend Wolf (White)","Wolf",         26069, "Creature\\Wolf\\Wolf.m2" },  -- Fixed: was 26068 (invalid)
-
-    -- ==============================
-    -- BEARS (Northrend)
-    -- ==============================
-    { "Northrend Bear (Black)","Bear",         29415, "Creature\\Bear2\\Bear2.m2" },  -- Fixed: was 29414 (invalid)
-    { "Northrend Bear (White)","Bear",         26646, "Creature\\Bear2\\Bear2.m2" },  -- Fixed: was 26647 (invalid)
-
-    -- ==============================
-    -- CATS (Northrend)
-    -- ==============================
-    { "Northrend Cat (Saber)", "Cat",          26083, "Creature\\Panther\\Panther.m2" },
-    { "Sholazar Tiger",        "Cat",          26669, "Creature\\Tiger\\Tiger.m2" },
-
-    -- ==============================
-    -- RAPTORS (Northrend)
-    -- ==============================
-    { "Northrend Raptor",      "Raptor",       26204, "Creature\\Raptor\\Raptor.m2" },  -- Fixed: was 26203 (invalid)
-
-    -- ==============================
-    -- SPIDERS (Northrend)
-    -- ==============================
-    { "Northrend Spider (White)","Spider",     26047, "Creature\\Spider\\Spider.m2" },  -- Fixed: was 26048 (invalid)
-    { "Northrend Spider (Black)","Spider",     26050, "Creature\\Spider\\Spider.m2" },  -- Fixed: was 26049 (invalid)
-
-    -- ==============================
-    -- WASPS (Northrend)
-    -- ==============================
-    { "Northrend Wasp",        "Wasp",         25864, "Creature\\Wasp\\Wasp.m2" },  -- Fixed: was 25863 (invalid)
-
-    -- ==============================
-    -- MOTHS (Northrend)
-    -- ==============================
-    { "Northrend Moth",        "Moth",         25859, "Creature\\Moth\\Moth.m2" },  -- Fixed: was 25858 (invalid)
-
-    -- ==============================
-    -- MISCELLANEOUS TAMEABLE
-    -- ==============================
-    { "Scorpid (Northrend)",   "Scorpid",      26030, "Creature\\Scorpid\\Scorpid.m2" },  -- Fixed: was 26029 (invalid)
-    { "Tallstrider (Northrend)","Tallstrider",  26092, "Creature\\Tallstrider\\Tallstrider.m2" },  -- Fixed: was 26091 (invalid)
-    { "Turtle (Northrend)",    "Turtle",       26083, "Creature\\Turtle\\Turtle.m2" },  -- Fixed: was 26082 (invalid)
-    { "Crab (Northrend)",      "Crab",         25998, "Creature\\Crab\\Crab.m2" },  -- Fixed: was 25997 (invalid)
-    { "Bat (Northrend)",       "Bat",          26011, "Creature\\Bat\\Bat.m2" },  -- Fixed: was 26012 (invalid)
-    { "Carrion Bird (Northrend)","Carrion Bird",26076,"Creature\\Vulture\\Vulture.m2" },  -- Fixed: was 26075 (invalid)
-    { "Dragonhawk (Northrend)","Dragonhawk",   26670, "Creature\\DragonHawk\\DragonHawk.m2" },  -- Fixed: was 26669 (invalid)
+    { "Worm (Jormungarlarvablue)", "Worm", 24564, "Creature\\Jormungar\\Jormungar.m2" },
+    { "Worm (Blue)", "Worm", 12333, "Creature\\Jormungar\\Jormungar.m2" },
+    { "Worm (Brown)", "Worm", 8182, "Creature\\Jormungar\\Jormungar.m2" },
+    { "Worm (Gray)", "Worm", 15386, "Creature\\Jormungar\\Jormungar.m2" },
+    { "Worm (Green)", "Worm", 12335, "Creature\\Jormungar\\Jormungar.m2" },
+    { "Worm (White)", "Worm", 7549, "Creature\\Jormungar\\Jormungar.m2" },
+    { "Worm (Yellow)", "Worm", 12336, "Creature\\Jormungar\\Jormungar.m2" },
 
     -- ==============================
     -- WARLOCK DEMONS
@@ -419,7 +366,7 @@ ns.combatPetsDB = {
     -- ==============================
     { "Water Elemental",       "Mage",         525,   "Creature\\WaterElemental\\WaterElemental.m2", 510 },
     { "Water Elemental (Large)","Mage",        5765,  "Creature\\WaterElemental\\WaterElemental.m2" },
-    { "Water Elemental (Glacial)","Mage",      28232, "Creature\\WaterElemental\\WaterElemental.m2" },  -- Fixed: was 28231 (invalid)
+    { "Water Elemental (Glacial)", "Mage",      28232, "Creature\\WaterElemental\\WaterElemental.m2" },
     { "Frost Elemental",       "Mage",         26428, "Creature\\FrostElemental\\FrostElemental.m2" },
     { "Bound Water Elemental", "Mage",         16942, "Creature\\WaterElemental\\WaterElemental.m2" },
 }

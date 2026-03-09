@@ -49,6 +49,8 @@ ns.mountsDB = {
     { "Spotted Frostsaber",             8394,   6448,   "Creature\\NightElfMount\\NightElfMount.m2" },
     { "Striped Frostsaber",             8395,   6444,   "Creature\\NightElfMount\\NightElfMount.m2" },
     { "Striped Nightsaber",             10793,  6443,   "Creature\\NightElfMount\\NightElfMount.m2" },
+    { "Reins of the Ancient Frostsaber", 12302, 6444,   "Creature\\NightElfMount\\NightElfMount.m2" },
+    { "Reins of the Nightsaber",        12303,  6443,   "Creature\\NightElfMount\\NightElfMount.m2" },
     { "Swift Frostsaber", 23221, 14331, "Creature\\NightElfMount\\NightElfMount.m2" },
     { "Swift Mistsaber",                23219,  14332,  "Creature\\NightElfMount\\NightElfMount.m2" },
     { "Swift Stormsaber",               23338,  14632,  "Creature\\NightElfMount\\NightElfMount.m2" },

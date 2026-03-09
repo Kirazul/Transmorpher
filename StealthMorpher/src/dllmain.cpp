@@ -82,6 +82,8 @@ static const uint32_t UNIT_FIELD_CRITTER          = 0x0A * 4;  // critter GUID (
 static const uint32_t UNIT_FIELD_SUMMON           = 0x08 * 4;  // summoned pet GUID (hunter/warlock pet)
 static const uint32_t UNIT_FIELD_SUMMONEDBY       = 0x0E * 4;  // GUID of unit that summoned this one
 static const uint32_t UNIT_FIELD_CREATEDBY        = 0x10 * 4;  // GUID of unit that created this one
+static const uint32_t PLAYER_FIELD_CHOSEN_TITLE   = 0x141 * 4; // PLAYER_CHOSEN_TITLE (3.3.5a 12340)
+static const uint32_t PLAYER_FIELD_KNOWN_TITLES   = 0x272 * 4; // PLAYER__FIELD_KNOWN_TITLES (start, 6 uint32 total)
 
 static uint32_t GetVisibleItemField(int slot) {
     if (slot < 1 || slot > 19) return 0;
@@ -165,6 +167,71 @@ static auto GetObjectPtr = (GetObjectPtr_fn)0x004D4DB0;
 
 typedef void(__thiscall* UpdateDisplayInfo_fn)(void* thisPtr, uint32_t unk);
 static auto CGUnit_UpdateDisplayInfo = (UpdateDisplayInfo_fn)0x0073E410;
+
+// Time/Day-Night (3.3.5a 12340)
+// Hook at 0x0076CFF0 to override game time (re-implemented using .1337 file logic)
+static const DWORD TIME_HOOK_ADDR = 0x0076CFF0;
+static const DWORD TIME_VAR_ADDR = 0x0076D000;
+static float g_timeOfDay = 0.5f;
+static bool g_timeHookInstalled = false;
+static BYTE g_timeHookOrigBytes[32] = {0}; // Increased size to cover var area too
+
+static bool InstallTimeHook() {
+    if (g_timeHookInstalled) return true;
+    
+    // Unprotect a larger block to cover both hook and var
+    DWORD oldProt;
+    if (!VirtualProtect((void*)TIME_HOOK_ADDR, 64, PAGE_EXECUTE_READWRITE, &oldProt)) {
+        Log("ERROR: Time hook VirtualProtect failed");
+        return false;
+    }
+
+    // Save original bytes (enough for hook + var)
+    memcpy(g_timeHookOrigBytes, (void*)TIME_HOOK_ADDR, 32);
+
+    // Prepare patch
+    // 50           push eax
+    // B8 00 D0 76 00 mov eax, 0076D000
+    // D9 00        fld dword ptr [eax]
+    // 58           pop eax
+    // C3           ret
+    // ... NOPs ...
+    
+    BYTE patch[16];
+    memset(patch, 0x90, 16);
+    
+    patch[0] = 0x50;
+    patch[1] = 0xB8;
+    *(DWORD*)(patch + 2) = TIME_VAR_ADDR;
+    patch[6] = 0xD9;
+    patch[7] = 0x00;
+    patch[8] = 0x58;
+    patch[9] = 0xC3;
+    
+    memcpy((void*)TIME_HOOK_ADDR, patch, 16);
+    
+    // Initialize the var at 0x0076D000
+    *(float*)TIME_VAR_ADDR = g_timeOfDay;
+    
+    // We leave it writable/executable so we can update the float dynamically
+    // VirtualProtect((void*)TIME_HOOK_ADDR, 64, oldProt, &oldProt);
+    
+    g_timeHookInstalled = true;
+    Log("Time hook installed at 0x%08X (using storage at 0x%08X)", TIME_HOOK_ADDR, TIME_VAR_ADDR);
+    return true;
+}
+
+static void UninstallTimeHook() {
+    if (!g_timeHookInstalled) return;
+    
+    DWORD oldProt;
+    if (VirtualProtect((void*)TIME_HOOK_ADDR, 64, PAGE_EXECUTE_READWRITE, &oldProt)) {
+        memcpy((void*)TIME_HOOK_ADDR, g_timeHookOrigBytes, 32);
+        VirtualProtect((void*)TIME_HOOK_ADDR, 64, oldProt, &oldProt);
+    }
+    g_timeHookInstalled = false;
+    Log("Time hook uninstalled");
+}
 
 // ================================================================
 // Get player object using SimplyMorpher3's exact method
@@ -285,8 +352,13 @@ static float    g_morphHPetScale = 0.0f; // desired hunter pet scale (0 = no cha
 // slot 16 = Main Hand, slot 17 = Off-Hand (1-based equipment slots)
 static uint32_t g_morphEnchantMH = 0;  // desired enchant ID for main hand
 static uint32_t g_morphEnchantOH = 0;  // desired enchant ID for off-hand
+// Title morph state
+static uint32_t g_morphTitle = 0;      // desired title ID
+static bool g_origTitleWasKnown = false; // was title originally known?
+
 static uint32_t g_origEnchantMH = 0;   // original enchant ID before morph
 static uint32_t g_origEnchantOH = 0;   // original enchant ID before morph
+static uint32_t g_origTitle = 0;       // original title before morph
 
 // Track equipped weapons to detect swaps
 // We need to track the actual item GUID, not just display ID
@@ -307,6 +379,24 @@ static uint64_t g_lastPlayerGuid = 0;
 // Counts down from 3 to 0. While > 0, each tick re-stamps + updates.
 static int g_weaponRefreshTicks = 0;
 
+static bool IsTitleKnown(WowObject* player, uint32_t titleId) {
+    if (!player || !player->descriptors || titleId == 0) return false;
+    uint32_t* known = (uint32_t*)((uint8_t*)player->descriptors + PLAYER_FIELD_KNOWN_TITLES);
+    int idx = titleId / 32;
+    if (idx >= 6) return false;
+    return (known[idx] & (1 << (titleId % 32))) != 0;
+}
+
+static void SetTitleKnown(WowObject* player, uint32_t titleId, bool known) {
+    if (!player || !player->descriptors || titleId == 0) return;
+    uint32_t* arr = (uint32_t*)((uint8_t*)player->descriptors + PLAYER_FIELD_KNOWN_TITLES);
+    int idx = titleId / 32;
+    if (idx >= 6) return;
+    uint32_t mask = (1 << (titleId % 32));
+    if (known) arr[idx] |= mask;
+    else arr[idx] &= ~mask;
+}
+
 // ================================================================
 // Helper: Recompute g_hasMorph
 // ================================================================
@@ -319,6 +409,7 @@ static void UpdateHasMorph() {
     if (g_morphHPet > 0)    { g_hasMorph = true; return; }
     if (g_morphEnchantMH > 0) { g_hasMorph = true; return; }
     if (g_morphEnchantOH > 0) { g_hasMorph = true; return; }
+    if (g_morphTitle > 0)   { g_hasMorph = true; return; }
     for (int s = 1; s <= 19; s++) {
         if (g_morphItems[s] > 0) { g_hasMorph = true; return; }
     }
@@ -346,6 +437,8 @@ static void SaveOriginals(WowObject* p) {
         if (offMH) g_origEnchantMH = *(uint32_t*)(desc + offMH);
         if (offOH) g_origEnchantOH = *(uint32_t*)(desc + offOH);
     }
+    // Save original title
+    g_origTitle = *(uint32_t*)(desc + PLAYER_FIELD_CHOSEN_TITLE);
     g_saved = true;
     Log("Originals saved (display=%u, scale=%.2f)", g_origDisplay, g_origScale);
 }
@@ -388,6 +481,10 @@ static void RefreshOriginals(WowObject* p) {
     if (g_morphEnchantOH == 0) {
         uint32_t off = GetVisibleEnchantField(17);
         if (off) g_origEnchantOH = *(uint32_t*)(desc + off);
+    }
+    // Update original title if not morphed
+    if (g_morphTitle == 0) {
+        g_origTitle = *(uint32_t*)(desc + PLAYER_FIELD_CHOSEN_TITLE);
     }
 }
 
@@ -788,6 +885,19 @@ static bool ApplyMorphState(WowObject* player) {
         }
     }
 
+    if (g_morphTitle > 0) {
+        uint32_t current = *(uint32_t*)(desc + PLAYER_FIELD_CHOSEN_TITLE);
+        if (current != g_morphTitle) {
+            *(uint32_t*)(desc + PLAYER_FIELD_CHOSEN_TITLE) = g_morphTitle;
+            changed = true;
+        }
+        // Force title to be known
+        if (!IsTitleKnown(player, g_morphTitle)) {
+            SetTitleKnown(player, g_morphTitle, true);
+            changed = true;
+        }
+    }
+
     for (int s = 1; s <= 19; s++) {
         if (g_morphItems[s] > 0) {
             uint32_t off = GetVisibleItemField(s);
@@ -1093,6 +1203,52 @@ static bool DoMorph(const char* cmd, WowObject* player) {
         update = true;
         Log("Enchant morph reset");
     }
+    else if (strncmp(cmd, "TITLE:", 6) == 0) {
+        uint32_t titleId = (uint32_t)atoi(cmd + 6);
+        if (titleId == 0) {
+            return false;
+        }
+        // If we are switching from a previously morphed title, restore its known state
+        if (g_morphTitle > 0 && g_morphTitle != titleId) {
+            SetTitleKnown(player, g_morphTitle, g_origTitleWasKnown);
+        }
+        // Always save the current title as original before morphing
+        if (g_origTitle == 0) {
+            g_origTitle = *(uint32_t*)(desc + PLAYER_FIELD_CHOSEN_TITLE);
+        }
+        
+        // Capture known state of NEW title before we force it
+        if (g_morphTitle != titleId) {
+            g_origTitleWasKnown = IsTitleKnown(player, titleId);
+        }
+        
+        g_morphTitle = titleId;
+        *(uint32_t*)(desc + PLAYER_FIELD_CHOSEN_TITLE) = titleId;
+        // Force known bit immediately
+        SetTitleKnown(player, titleId, true);
+        {
+            char luaCmd[128];
+            sprintf_s(luaCmd, "if SetCurrentTitle then SetCurrentTitle(%u) end", titleId);
+            FrameScript_Execute(luaCmd, "Transmorpher", 0);
+            FrameScript_Execute("if PaperDollTitlesPane_Update then PaperDollTitlesPane_Update() end", "Transmorpher", 0);
+        }
+        
+        update = true;
+    }
+    else if (strncmp(cmd, "TITLE_RESET", 11) == 0) {
+        // Restore original title
+        if (g_morphTitle > 0) {
+            *(uint32_t*)(desc + PLAYER_FIELD_CHOSEN_TITLE) = g_origTitle;
+            // Restore known bit
+            SetTitleKnown(player, g_morphTitle, g_origTitleWasKnown);
+        }
+        FrameScript_Execute("if SetCurrentTitle then SetCurrentTitle(0) end", "Transmorpher", 0);
+        FrameScript_Execute("if PaperDollTitlesPane_Update then PaperDollTitlesPane_Update() end", "Transmorpher", 0);
+        g_morphTitle = 0;
+        g_origTitle = 0;
+        g_origTitleWasKnown = false;
+        update = true;
+    }
     else if (strncmp(cmd, "SUSPEND", 7) == 0) {
         // Addon signals: model-changing form active, stop overriding
         g_suspended = true;
@@ -1185,6 +1341,11 @@ static bool DoMorph(const char* cmd, WowObject* player) {
             if (g_morphEnchantOH > 0) {
                 WriteVisibleEnchant(player, 17, g_origEnchantOH);
             }
+            // Restore title
+            if (g_morphTitle > 0) {
+                *(uint32_t*)(desc + PLAYER_FIELD_CHOSEN_TITLE) = g_origTitle;
+                SetTitleKnown(player, g_morphTitle, g_origTitleWasKnown);
+            }
         }
         // ALWAYS clear all morph state — even if g_saved was false.
         // On character switch, the DLL must re-capture originals via SaveOriginals.
@@ -1196,10 +1357,13 @@ static bool DoMorph(const char* cmd, WowObject* player) {
         g_morphHPetScale = 0.0f;
         g_morphEnchantMH = 0;
         g_morphEnchantOH = 0;
+        g_morphTitle = 0;
         g_origPetDisplay = 0;
         g_origHPetDisplay = 0;
         g_origEnchantMH = 0;
         g_origEnchantOH = 0;
+        g_origTitle = 0;
+        g_origTitleWasKnown = false;
         g_origMount = 0;
         g_origDisplay = 0;
         g_origScale = 1.0f;
@@ -1211,6 +1375,32 @@ static bool DoMorph(const char* cmd, WowObject* player) {
         g_saved = false;
         update = true;
         Log("Reset all");
+    }
+    else if (strncmp(cmd, "TIME:", 5) == 0) {
+        float val = (float)atof(cmd + 5);
+        if (val < 0.0f) {
+            // Negative value = reset (uninstall hook)
+            UninstallTimeHook();
+            Log("Time reset (hook uninstalled)");
+        } else {
+            g_timeOfDay = val;
+            // Clamp to 0-1
+            if (g_timeOfDay < 0.0f) g_timeOfDay = 0.0f;
+            if (g_timeOfDay > 1.0f) g_timeOfDay = 1.0f;
+            
+            // Ensure hook is installed
+            if (!g_timeHookInstalled) {
+                InstallTimeHook();
+            }
+            
+            // Write directly to the storage address
+            __try {
+                *(float*)TIME_VAR_ADDR = g_timeOfDay;
+                Log("Time set to %.3f (at 0x%08X)", g_timeOfDay, TIME_VAR_ADDR);
+            } __except(EXCEPTION_EXECUTE_HANDLER) {
+                Log("ERROR: Failed to write time to 0x%08X", TIME_VAR_ADDR);
+            }
+        }
     }
     else if (strncmp(cmd, "RESET:", 6) == 0 && g_saved) {
         int slot = atoi(cmd + 6);
@@ -1409,6 +1599,20 @@ static void MorphGuard(WowObject* player) {
             }
         } __except(EXCEPTION_EXECUTE_HANDLER) {}
     }
+
+    // --- Title morph guard ---
+    if (g_morphTitle > 0) {
+        __try {
+            uint32_t curTitle = *(uint32_t*)(desc + PLAYER_FIELD_CHOSEN_TITLE);
+            if (curTitle != g_morphTitle) {
+                *(uint32_t*)(desc + PLAYER_FIELD_CHOSEN_TITLE) = g_morphTitle;
+            }
+            // Enforce known bit
+            if (!IsTitleKnown(player, g_morphTitle)) {
+                SetTitleKnown(player, g_morphTitle, true);
+            }
+        } __except(EXCEPTION_EXECUTE_HANDLER) {}
+    }
     
     // Pet/mount morphs are persistent and don't need guard logic
 }
@@ -1447,10 +1651,13 @@ static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWOR
                     g_morphHPetScale = 0.0f;
                     g_morphEnchantMH = 0;
                     g_morphEnchantOH = 0;
+                    g_morphTitle = 0;
                     g_origPetDisplay = 0;
                     g_origHPetDisplay = 0;
                     g_origEnchantMH = 0;
                     g_origEnchantOH = 0;
+                    g_origTitle = 0;
+                    g_origTitleWasKnown = false;
                     g_lastWeaponMHGuid = 0;
                     g_lastWeaponOHGuid = 0;
                     g_origMount = 0;
@@ -1617,6 +1824,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
         
         // Uninstall mount hook
         UninstallMountHook();
+        UninstallTimeHook();
         
         // Give time for any pending operations to complete
         Sleep(50);
