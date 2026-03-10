@@ -765,6 +765,8 @@ end
 -- ============================================================
 local function SyncDressingRoom()
     if not mainFrame or not mainFrame.dressingRoom or not mainFrame.slots then return end
+    -- Force model reset to player before undressing to ensure valid state
+    mainFrame.dressingRoom:SetUnit("player")
     mainFrame.dressingRoom:Undress()
     
     -- Check if main hand or off-hand weapons exist
@@ -2846,6 +2848,8 @@ do
                 -- User is previewing a different item: temporarily hide the morph glow.
                 -- Reset Preview will restore the morphed item + glow if still morphed.
                 HideMorphGlow(mainFrame.selectedSlot)
+                -- Refresh the dressing room to show the new item + all other previewed items
+                SyncDressingRoom()
             end
         end
         list.onEnter(self)
@@ -7459,4 +7463,4 @@ do
 end
 
 -- Print load message
-DEFAULT_CHAT_FRAME:AddMessage("|cffF5C842⚔ Transmorpher|r v1.1.4 loaded — |cffC8AA6E/morph|r or click the button on your character model.")
+DEFAULT_CHAT_FRAME:AddMessage("|cffF5C842⚔ Transmorpher|r v1.1.5 loaded — |cffC8AA6E/morph|r or click the button on your character model.")
