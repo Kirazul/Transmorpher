@@ -43,11 +43,12 @@ end
 local function button_OnClick(self, button)
     local mainFrame = self:GetParent():GetParent()
     local onItemClick = mainFrame.onItemClick
-    mainFrame.selectedItemId = self:GetParent().itemId
+    local clickedId = self:GetParent().itemId
+    mainFrame.selectedItemId = clickedId
     mainFrame.selectedItemIndex = self:GetParent().itemIndex
-    if mainFrame.selectedItemId ~= nil then
+    if clickedId ~= nil then
         for _, dr in ipairs(mainFrame.dressingRooms) do
-            if dr.itemId == mainFrame.selectedItemId then
+            if dr.itemId == clickedId then
                 dr:SetBackdropBorderColor(unpack(selectedItemBackdropBorderColor))
             else
                 dr:SetBackdropBorderColor(unpack(itemBackdropBorderColor))
@@ -88,7 +89,7 @@ local recycler = {
         while #result < number do
             if self.recycled[parent] == nil then self.recycled[parent] = {} end
             local recycled = self.recycled[parent]
-            if #self.recycled > 0 then
+            if #recycled > 0 then
                 table.insert(result, table.remove(recycled))
             else
                 self.counter = self.counter + 1
@@ -140,20 +141,19 @@ local recycler = {
 
 
 local function PreviewList_SetItems(self, itemIds)
+    self.customEntries = nil
     table.wipe(self.itemIds)
     for i=1, #itemIds do
         table.insert(self.itemIds, itemIds[i])
     end
     self.selectedItemId = nil
     self.selectedItemIndex = nil
-    --if self.dressingRoomSetup ~= nil then
-    --    self:Update()
-    --end
 end
 
 
 local function PreviewList_SetupModel(self, width, height, x, y, z, facing, sequence)
-    assert(#self.itemIds > 0, "`SetItemIds` first.")
+    local source = self.customEntries or self.itemIds
+    assert(#source > 0, "`SetItemIds` first.")
     self.dressingRoomSetup = {
         ["width"] = width,
         ["height"] = height,
@@ -161,7 +161,8 @@ local function PreviewList_SetupModel(self, width, height, x, y, z, facing, sequ
         ["y"] = y,
         ["z"] = z,
         ["facing"] = facing,
-        ["sequence"] = sequence,}
+        ["sequence"] = sequence,
+    }
     local countW = math.floor(self:GetWidth() / width)
     local countH = math.floor(self:GetHeight() / height)
     local perPage = countW * countH
@@ -191,7 +192,7 @@ local function PreviewList_SetupModel(self, width, height, x, y, z, facing, sequ
                 dr.itemIndex = nil
                 dr.isQuerying = false
                 dr:SetSize(width, height)
-                dr:SetBackdropBorderColor(itemBackdropBorderColor)
+                dr:SetBackdropBorderColor(unpack(itemBackdropBorderColor))
             end
         end
     end
@@ -210,10 +211,11 @@ end
 
 
 local function PreviewList_GetPageCount(self)
-    if #self.itemIds == 0 or #self.dressingRooms == 0 then
+    local source = self.customEntries or self.itemIds
+    if #source == 0 or #self.dressingRooms == 0 then
         return 0
     end
-    return math.ceil(#self.itemIds/#self.dressingRooms)
+    return math.ceil(#source/#self.dressingRooms)
 end
 
 
@@ -243,6 +245,44 @@ end
 
 local function PreviewList_Update(self)
     if self.dressingRoomSetup == nil then return end
+    if self.customEntries ~= nil then
+        local perPage = #self.dressingRooms
+        if perPage <= 0 then return end
+        for i = 1, perPage do
+            local dr = self.dressingRooms[i]
+            local itemIndex = (self.currentPage - 1) * perPage + i
+            local entry = self.customEntries[itemIndex]
+            if entry == nil then
+                dr:OnUpdateModel(nil)
+                dr:ClearModel()
+                dr:Hide()
+            else
+                dr.itemId = entry.id
+                dr.itemIndex = itemIndex
+                dr.isQuerying = false
+                dr:Show()
+                dr:Reset()
+                dr:Undress()
+                dr:SetModelAlpha(1)
+                dr:SetLight(1, 0, 0, 1, 0, 1, 0.7, 0.7, 0.7, 1, 0.8, 0.8, 0.64)
+                local setup = self.dressingRoomSetup
+                dr:SetPosition(setup.x, setup.y, setup.z)
+                dr:SetFacing(setup.facing)
+                dr.button:Show()
+                dr.queriedLabel:Hide()
+                dr.queryFailedLabel:Hide()
+                if self.customRenderer then
+                    self.customRenderer(dr, entry, self)
+                end
+                if dr.itemId == self.selectedItemId then
+                    dr:SetBackdropBorderColor(unpack(selectedItemBackdropBorderColor))
+                else
+                    dr:SetBackdropBorderColor(unpack(itemBackdropBorderColor))
+                end
+            end
+        end
+        return
+    end
     if #self.itemIds == 0 then
         -- Nothing to display — hide all dressing rooms
         for _, dr in ipairs(self.dressingRooms) do
@@ -286,7 +326,18 @@ end
 
 
 local function PreviewList_SelectByItemId(self, itemId)
-    local index = getIndexOf(self.itemIds, itemId)
+    local source = self.customEntries or self.itemIds
+    local index = nil
+    if self.customEntries then
+        for i, entry in ipairs(source) do
+            if entry.id == itemId then
+                index = i
+                break
+            end
+        end
+    else
+        index = getIndexOf(source, itemId)
+    end
     if index ~= nil then
         self.selectedItemId = itemId
         self.selectedItemIndex = index
@@ -312,6 +363,21 @@ local function PreviewList_TryOn(self, item)
     end
 end
 
+local function PreviewList_SetCustomEntries(self, entries)
+    table.wipe(self.itemIds)
+    if entries then
+        self.customEntries = entries
+    else
+        self.customEntries = nil
+    end
+    self.selectedItemId = nil
+    self.selectedItemIndex = nil
+end
+
+local function PreviewList_SetCustomRenderer(self, renderer)
+    self.customRenderer = renderer
+end
+
 
 function ns.CreatePreviewList(parent)
     local frame = CreateFrame("Frame", addon.."PreviewList", parent)
@@ -320,16 +386,8 @@ function ns.CreatePreviewList(parent)
     frame.dressingRooms = {}
     frame.currentPage = 1
     frame.dressingRoomSetup = nil
-    --[[
-    frame.dressingRoomSetup = {
-        ["width"] = 0,
-        ["height"] = 0,
-        ["x"] = 0.0,
-        ["y"] = 0.0,
-        ["z"] = 0.0,
-        ["facing"] = 0.0,
-        ["sequence"] = 0,
-    }]]
+    frame.customEntries = nil
+    frame.customRenderer = nil
     frame.onEnter = nil
     frame.onLeave = nil
     frame.onItemClick = nil
@@ -345,6 +403,8 @@ function ns.CreatePreviewList(parent)
     frame.GetPageCount = PreviewList_GetPageCount
     frame.SelectByItemId = PreviewList_SelectByItemId
     frame.TryOn = PreviewList_TryOn
+    frame.SetCustomEntries = PreviewList_SetCustomEntries
+    frame.SetCustomRenderer = PreviewList_SetCustomRenderer
 
     frame:SetScript("OnShow", function(self)
         if self.dressingRoomSetup ~= nil then

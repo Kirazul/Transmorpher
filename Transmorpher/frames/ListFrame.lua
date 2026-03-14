@@ -17,7 +17,7 @@ local recycler = {
         while #result < number do
             if self.recycled[parent] == nil then self.recycled[parent] = {} end
             local recycled = self.recycled[parent]
-            if #self.recycled > 0 then
+            if #recycled > 0 then
                 table.insert(result, table.remove(recycled))
             else
                 self.counter = self.counter + 1

@@ -5,7 +5,7 @@ local addon, ns = ...
 -- Centralized color palette, dimensions, slot data, race data
 -- ============================================================
 
-ns.VERSION = "1.1.5"
+ns.VERSION = "1.1.6"
 ns.ADDON_PREFIX = "Transmorpher"
 
 -- ============================================================
@@ -240,10 +240,14 @@ ns.defaultSettings = {
     saveHunterPetMorph = true,
     saveCombatPetMorph = true,
     showMetamorphosis = true,
+    showDBWProc = true,
     morphInShapeshift = false,
     worldTime = nil,
     enableWorldSync = true,
     limitToGroup = false,
+    maxVisiblePlayers = 0,
+    showMinimapButton = true,
+    hidePaperdollButton = false,
 }
 
 -- ============================================================
@@ -266,7 +270,7 @@ ns.tabConfig = {
     { key = "appearances",label = "Loadouts",    icon = "Interface\\Icons\\INV_Misc_Book_11" },
     { key = "mounts",     label = "Mounts",      icon = "Interface\\Icons\\Ability_Mount_RidingHorse" },
     { key = "pets",       label = "Pets",         icon = "Interface\\Icons\\INV_Box_PetCarrier_01" },
-    { key = "combatPets", label = "Combat Pets",  icon = "Interface\\Icons\\Ability_Hunter_BeastCall" },
+    { key = "combatPets", label = "CPets",        icon = "Interface\\Icons\\Ability_Hunter_BeastCall" },
     { key = "morph",      label = "Morph",        icon = "Interface\\Icons\\Spell_Shadow_Charm" },
     { key = "env",        label = "Misc",         icon = "Interface\\Icons\\Spell_Nature_EarthBind" },
     { key = "settings",   label = "Settings",     icon = "Interface\\Icons\\INV_Misc_Gear_01" },

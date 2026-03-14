@@ -168,6 +168,8 @@ function ns.CreateDressingRoom(name, parent)
     function frame:Reset()
         local x, y, z = model:GetPosition()
         local facing = model:GetFacing()
+        if not x then x, y, z = 0, 0, 0 end
+        if not facing then facing = 0 end
         model:SetPosition(0, 0, 0)
         model:SetFacing(0)
         model:ClearModel()
@@ -177,10 +179,11 @@ function ns.CreateDressingRoom(name, parent)
         _, unitRaceFileName = UnitRace(unit)
         unitSex = UnitSex(unit)
 
-        local minX = modelX.min[unitRaceFileName][sex[unitSex]]
-        local maxX = modelX.max[unitRaceFileName][sex[unitSex]]
-        local minZ = modelZ.min[unitRaceFileName][sex[unitSex]]
-        local maxZ = modelZ.max[unitRaceFileName][sex[unitSex]]
+        local sexKey = sex[unitSex] or "male"
+        local minX = (modelX.min[unitRaceFileName] and modelX.min[unitRaceFileName][sexKey]) or -0.75
+        local maxX = (modelX.max[unitRaceFileName] and modelX.max[unitRaceFileName][sexKey]) or 2.6
+        local minZ = (modelZ.min[unitRaceFileName] and modelZ.min[unitRaceFileName][sexKey]) or -1.15
+        local maxZ = (modelZ.max[unitRaceFileName] and modelZ.max[unitRaceFileName][sexKey]) or 1.25
 
         x = x < minX and minX or x > maxX and maxX or x
         z = z < minZ and minZ or z > maxZ and maxZ or z
@@ -191,9 +194,17 @@ function ns.CreateDressingRoom(name, parent)
     end
 
     function frame:SetUnit(newUnit)
-        if UnitIsPlayer(newUnit) and CheckInteractDistance(newUnit, 1) then
+        local canSet = false
+        if newUnit == "player" then
+            canSet = true
+        elseif UnitIsPlayer(newUnit) and CheckInteractDistance(newUnit, 1) then
+            canSet = true
+        end
+        if canSet then
             local x, y, z = model:GetPosition()    
             local facing = model:GetFacing()
+            if not x then x, y, z = 0, 0, 0 end
+            if not facing then facing = 0 end
             model:SetPosition(0, 0, 0)
             model:SetFacing(0)
             model:ClearModel()
@@ -201,10 +212,11 @@ function ns.CreateDressingRoom(name, parent)
             unit = newUnit
             _, unitRaceFileName = UnitRace(unit)
             unitSex = UnitSex(unit)
-            local minX = modelX.min[unitRaceFileName][sex[unitSex]]
-            local maxX = modelX.max[unitRaceFileName][sex[unitSex]]
-            local minZ = modelZ.min[unitRaceFileName][sex[unitSex]]
-            local maxZ = modelZ.max[unitRaceFileName][sex[unitSex]]
+            local sexKey = sex[unitSex] or "male"
+            local minX = (modelX.min[unitRaceFileName] and modelX.min[unitRaceFileName][sexKey]) or -0.75
+            local maxX = (modelX.max[unitRaceFileName] and modelX.max[unitRaceFileName][sexKey]) or 2.6
+            local minZ = (modelZ.min[unitRaceFileName] and modelZ.min[unitRaceFileName][sexKey]) or -1.15
+            local maxZ = (modelZ.max[unitRaceFileName] and modelZ.max[unitRaceFileName][sexKey]) or 1.25
 
             x = x < minX and minX or x > maxX and maxX or x
             z = z < minZ and minZ or z > maxZ and maxZ or z

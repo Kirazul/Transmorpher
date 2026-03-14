@@ -9,7 +9,7 @@ scrollFrame:SetPoint("TOPLEFT", 8, -8)
 scrollFrame:SetPoint("BOTTOMRIGHT", -28, 8)
 
 local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-scrollChild:SetSize(scrollFrame:GetWidth(), 760)
+scrollChild:SetSize(scrollFrame:GetWidth(), 794)
 scrollFrame:SetScrollChild(scrollChild)
 
 local function applyCardStyle(card)
@@ -126,7 +126,7 @@ createCheckboxRow(persistenceCard, "Save mount morph per character", "saveMountM
 createCheckboxRow(persistenceCard, "Save pet morph per character", "savePetMorph", -110, "Remember your companion pet morph for this character")
 createCheckboxRow(persistenceCard, "Save combat pet morph per character", "saveCombatPetMorph", -144, "Remember your hunter pet morph for this character")
 
-local behaviorCard = createCard(scrollChild, "Behavior", -202, 112)
+local behaviorCard = createCard(scrollChild, "Behavior", -202, 146)
 createCheckboxRow(behaviorCard, "Show Warlock Metamorphosis", "showMetamorphosis", -42, "Temporarily show the Metamorphosis demon form (suspend morph)", function(enabled)
     ns.SendRawMorphCommand("SET:META:"..(enabled and "1" or "0"))
     if classFileName == "WARLOCK" then
@@ -152,22 +152,40 @@ createCheckboxRow(behaviorCard, "Keep morph in shapeshift forms", "morphInShapes
         if not ns.dbwSuspended and not ns.vehicleSuspended then ns.SendRawMorphCommand("SUSPEND") end
     end
 end)
+createCheckboxRow(behaviorCard, "Show Deathbringer's Will procs", "showDBWProc", -110, "Show the DBW transformation instead of your morph while the proc is active", function(enabled)
+    ns.SendRawMorphCommand("SET:DBW:"..(enabled and "1" or "0"))
+    if not enabled and ns.dbwSuspended then
+        ns.dbwSuspended = false
+        if not ns.morphSuspended and not ns.vehicleSuspended then
+            ns.SendRawMorphCommand("RESUME")
+            if ns.SendFullMorphState then ns.SendFullMorphState() end
+        end
+    end
+end)
 
-local syncCard = createCard(scrollChild, "Multiplayer Synchronization", -322, 112)
+local syncCard = createCard(scrollChild, "Multiplayer Synchronization", -356, 112)
 createCheckboxRow(syncCard, "Activate Multiplayer Sync in World", "enableWorldSync", -42, "If disabled, removes all morphs from other players and stops broadcasting yours globally.", function(enabled)
     if not enabled then
         local settings = ns.GetSettings()
         settings.enableWorldSync = true
         if ns.BroadcastResetState then ns.BroadcastResetState() end
-        ns.ClearRemoteMorphs()
+        if ns.ClearRemoteMorphs then ns.ClearRemoteMorphs() end
         settings.enableWorldSync = false
     end
 end)
 createCheckboxRow(syncCard, "Activate Multiplayer Sync for Group/Raid Only", "limitToGroup", -76, "If enabled, sync only works via party/raid channels (ignoring global world sync).", function()
-    ns.ClearRemoteMorphs()
+    if ns.ClearRemoteMorphs then ns.ClearRemoteMorphs() end
 end)
 
-local statusCard = createCard(scrollChild, "System Status", -442, 102)
+local interfaceCard = createCard(scrollChild, "Interface", -472, 112)
+createCheckboxRow(interfaceCard, "Show Minimap Button", "showMinimapButton", -42, "Toggle the Transmorpher button on the minimap.", function(enabled)
+    if ns.UpdateMinimapButton then ns.UpdateMinimapButton() end
+end)
+createCheckboxRow(interfaceCard, "Hide Character Info Button", "hidePaperdollButton", -76, "Toggle the Transmorpher button on the Character info frame.", function(enabled)
+    if ns.UpdatePaperdollButtonVisibility then ns.UpdatePaperdollButtonVisibility() end
+end)
+
+local statusCard = createCard(scrollChild, "System Status", -592, 102)
 local statusIcon = statusCard:CreateTexture(nil, "ARTWORK")
 statusIcon:SetSize(30, 30)
 statusIcon:SetPoint("TOPLEFT", 14, -50)
@@ -193,7 +211,7 @@ local function UpdateDLLStatus()
     end
 end
 
-local aboutCard = createCard(scrollChild, "About", -552, 160)
+local aboutCard = createCard(scrollChild, "About", -702, 160)
 local infoText = aboutCard:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 infoText:SetPoint("TOPLEFT", 12, -42)
 infoText:SetPoint("BOTTOMRIGHT", -12, 12)

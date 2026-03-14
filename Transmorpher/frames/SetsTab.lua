@@ -573,6 +573,7 @@ function ns.InitSetsTab(parent)
         if not selectedSet then
             return
         end
+        PlaySound("LevelUp")
         local mainFrame = _G[addon]
         if not mainFrame then
             return
@@ -582,6 +583,7 @@ function ns.InitSetsTab(parent)
             local slot = mainFrame.slots[item.slot]
             if slot and slot.SetItem then
                 slot:SetItem(item.itemId)
+                ns.FlashMorphSlot(slot, "gold")
             end
         end
         if mainFrame.buttons and mainFrame.buttons.applyAll then
