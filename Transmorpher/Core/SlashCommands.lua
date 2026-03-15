@@ -74,21 +74,27 @@ SlashCmdList["Transmorpher"] = function(msg)
 
     if cmd == "reset" then
         if ns.IsMorpherReady() then
-            ns.SendMorphCommand("RESET:ALL")
-            -- Clear mount morphs
+            ns.SendMorphCommand("RESET:ALL|MOUNT_RESET|HPET_RESET|PET_RESET|TITLE_RESET|ENCHANT_RESET")
             if TransmorpherCharacterState then
+                if TransmorpherCharacterState.Items then wipe(TransmorpherCharacterState.Items) end
+                if TransmorpherCharacterState.HiddenItems then wipe(TransmorpherCharacterState.HiddenItems) end
+                if TransmorpherCharacterState.Mounts then wipe(TransmorpherCharacterState.Mounts) end
+                if TransmorpherCharacterState.WeaponSets then wipe(TransmorpherCharacterState.WeaponSets) end
+                TransmorpherCharacterState.Morph = nil
+                TransmorpherCharacterState.Scale = nil
+                TransmorpherCharacterState.PetDisplay = nil
+                TransmorpherCharacterState.HunterPetDisplay = nil
+                TransmorpherCharacterState.HunterPetScale = nil
+                TransmorpherCharacterState.EnchantMH = nil
+                TransmorpherCharacterState.EnchantOH = nil
+                TransmorpherCharacterState.TitleID = nil
                 TransmorpherCharacterState.GroundMountDisplay = nil
                 TransmorpherCharacterState.GroundMountName = nil
                 TransmorpherCharacterState.FlyingMountDisplay = nil
                 TransmorpherCharacterState.FlyingMountName = nil
                 TransmorpherCharacterState.MountDisplay = nil
                 TransmorpherCharacterState.MountHidden = false
-                if TransmorpherCharacterState.Mounts then
-                    wipe(TransmorpherCharacterState.Mounts)
-                end
             end
-            ns.SendRawMorphCommand("MOUNT_RESET")
-            -- Clear all morphed slot state
             if mainFrame.slots then
                 for _, slotName in pairs(ns.slotOrder) do
                     local slot = mainFrame.slots[slotName]
@@ -101,10 +107,22 @@ SlashCmdList["Transmorpher"] = function(msg)
                                 slot.eyeButton:UpdateVisuals()
                             end
                         end
-                        local equippedId = ns.GetEquippedItemForSlot(slotName)
-                        if equippedId then slot:SetItem(equippedId)
-                        else slot.itemId = nil; slot.textures.empty:Show(); slot.textures.item:Hide() end
+                        if slotName == ns.rangedSlot and ("DRUIDSHAMANPALADINDEATHKNIGHT"):find(ns.playerClass) then
+                            slot:RemoveItem()
+                        else
+                            local equippedId = ns.GetEquippedItemForSlot(slotName)
+                            if equippedId then slot:SetItem(equippedId)
+                            else slot:RemoveItem() end
+                        end
                     end
+                end
+            end
+            if mainFrame.specialSlots then
+                for _, s in pairs(mainFrame.specialSlots) do
+                    s.displayID = nil
+                    s.name = nil
+                    if s.icon then s.icon:Hide() end
+                    ns.HideMorphGlow(s)
                 end
             end
             if mainFrame.enchantSlots then
@@ -113,12 +131,13 @@ SlashCmdList["Transmorpher"] = function(msg)
                 end
             end
             ns.SyncDressingRoom()
+            if ns.UpdateMorphStatusBar then ns.UpdateMorphStatusBar() end
 
             if ns.BroadcastMorphState then
                 ns.BroadcastMorphState(true)
             end
 
-            SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: All morphs reset!")
+            SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: All morphs hard reset!")
         else
             SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: |cffff0000DLL not loaded!|r Place dinput8.dll in your WoW folder.")
         end

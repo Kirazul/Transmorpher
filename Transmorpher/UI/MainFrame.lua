@@ -124,10 +124,7 @@ stats:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
     GameTooltip:ClearLines()
     GameTooltip:AddLine("|cffF5C842Active Morphs|r", 1, 1, 1)
-    if not TRANSMORPHER_DLL_LOADED then
-        GameTooltip:AddLine("DLL not loaded", 1, 0.3, 0.3)
-        GameTooltip:Show(); return
-    end
+    -- DLL check removed (User override)
     local morphedSlots = {}
     if mainFrame.slots then
         for _, slotName in pairs(ns.slotOrder or {}) do
@@ -175,10 +172,7 @@ function ns.UpdateMorphStatusBar()
     local parts = {}
     local dllOk = TRANSMORPHER_DLL_LOADED
 
-    if not dllOk then
-        mainFrame.morphStatus:SetText("|cffff4444DLL Not Loaded|r")
-        return
-    end
+    -- DLL check removed (User override)
 
     local itemCount = 0
     if TransmorpherCharacterState and TransmorpherCharacterState.Items then

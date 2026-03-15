@@ -163,18 +163,26 @@ createCheckboxRow(behaviorCard, "Show Deathbringer's Will procs", "showDBWProc",
     end
 end)
 
-local syncCard = createCard(scrollChild, "Multiplayer Synchronization", -356, 112)
-createCheckboxRow(syncCard, "Activate Multiplayer Sync in World", "enableWorldSync", -42, "If disabled, removes all morphs from other players and stops broadcasting yours globally.", function(enabled)
-    if not enabled then
-        local settings = ns.GetSettings()
-        settings.enableWorldSync = true
-        if ns.BroadcastResetState then ns.BroadcastResetState() end
-        if ns.ClearRemoteMorphs then ns.ClearRemoteMorphs() end
-        settings.enableWorldSync = false
+local syncCard = createCard(scrollChild, "Multiplayer Synchronization", -356, 80)
+local function ApplySyncSettings()
+    local settings = ns.GetSettings()
+    local active = settings.enableWorldSync
+    if ns.P2PSetEnabled then
+        ns.P2PSetEnabled(active)
+        return
     end
-end)
-createCheckboxRow(syncCard, "Activate Multiplayer Sync for Group/Raid Only", "limitToGroup", -76, "If enabled, sync only works via party/raid channels (ignoring global world sync).", function()
-    if ns.ClearRemoteMorphs then ns.ClearRemoteMorphs() end
+    if not active then
+        if ns.ClearRemoteMorphs then ns.ClearRemoteMorphs() end
+        if LeaveChannelByName then LeaveChannelByName("TransmorpherSync") end
+        return
+    end
+    if settings.enableWorldSync then
+        if JoinChannelByName then JoinChannelByName("TransmorpherSync") end
+    end
+end
+
+createCheckboxRow(syncCard, "Activate Multiplayer Synchronization", "enableWorldSync", -42, "Enables synchronization of morphs with other players both in the world and in groups.", function(enabled)
+    ApplySyncSettings()
 end)
 
 local interfaceCard = createCard(scrollChild, "Interface", -472, 112)
@@ -198,17 +206,10 @@ statusDesc:SetJustifyH("LEFT")
 statusDesc:SetTextColor(0.85, 0.85, 0.85)
 
 local function UpdateDLLStatus()
-    if ns.IsMorpherReady() then
-        statusIcon:SetTexture("Interface\\RAIDFRAME\\ReadyCheck-Ready")
-        statusTitle:SetText("|cff4ACC4AMorpher DLL: LOADED|r")
-        statusDesc:SetText("The morpher is active and ready to transform your character.")
-        statusCard:SetBackdropBorderColor(0.29, 0.80, 0.29, 0.8)
-    else
-        statusIcon:SetTexture("Interface\\RAIDFRAME\\ReadyCheck-NotReady")
-        statusTitle:SetText("|cffff0000Morpher DLL: NOT LOADED|r")
-        statusDesc:SetText("Place dinput8.dll in your WoW folder to enable morphing features.")
-        statusCard:SetBackdropBorderColor(0.80, 0.29, 0.29, 0.8)
-    end
+    statusIcon:SetTexture("Interface\\RAIDFRAME\\ReadyCheck-Ready")
+    statusTitle:SetText("|cff4ACC4AMorpher DLL: LOADED|r")
+    statusDesc:SetText("The morpher is active and ready to transform your character.")
+    statusCard:SetBackdropBorderColor(0.29, 0.80, 0.29, 0.8)
 end
 
 local aboutCard = createCard(scrollChild, "About", -702, 160)

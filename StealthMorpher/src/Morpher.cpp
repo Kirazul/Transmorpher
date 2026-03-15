@@ -16,7 +16,9 @@ bool g_suspended = false;
 // Originals
 static uint32_t g_origDisplay = 0;
 static uint32_t g_origItems[20] = {0};
-static float g_origScale = 1.0f;
+float g_origScale = 1.0f; // Made non-static for Hooks.cpp
+static float g_origHeight = 0.0f;
+static float g_origRadius = 0.0f;
 static bool g_saved = false;
 uint32_t g_origMount = 0;
 static uint32_t g_origPetDisplay = 0;
@@ -115,7 +117,15 @@ static void SaveOriginals(WowObject* p) {
     if (offOH) g_origEnchantOH = *(uint32_t*)(desc + offOH);
     
     g_origTitle = *(uint32_t*)(desc + PLAYER_FIELD_CHOSEN_TITLE);
+    
+    // Character Geometry (Collision) Preservation
+    // Offsets for 3.3.5a 12340: Height (0x7B0), Radius (0x7B4)
+    g_origHeight = *(float*)((uint8_t*)p + 0x7B0);
+    g_origRadius = *(float*)((uint8_t*)p + 0x7B4);
+
     g_saved = true;
+    Log("Originals saved (DisplayID=%u, Scale=%.2f, Height=%.2f, Radius=%.2f)", 
+        g_origDisplay, g_origScale, g_origHeight, g_origRadius);
 }
 
 static void RefreshOriginals(WowObject* p) {
@@ -167,6 +177,20 @@ void ReStampWeapons(WowObject* player) {
         uint32_t off = GetVisibleEnchantField(17);
         if (off) *(uint32_t*)(desc + off) = g_morphEnchantOH;
     }
+}
+
+// Character Geometry (Collision) Preservation
+// Forces the collision box to remain at its original size even when morphed,
+// unless a specific scale morph is active.
+void RestoreCollision(WowObject* player) {
+    if (!player || !g_saved || g_morphDisplay == 0) return;
+    
+    // Scale multiplication: if no morph scale set, use original scale.
+    float currentScale = (g_morphScale > 0.0f) ? g_morphScale : g_origScale;
+    
+    // Write directly to unit fields responsible for collision
+    *(float*)((uint8_t*)player + 0x7B0) = g_origHeight * (currentScale / g_origScale);
+    *(float*)((uint8_t*)player + 0x7B4) = g_origRadius * (currentScale / g_origScale);
 }
 
 // IsTitleKnown and SetTitleKnown are defined in Utils.cpp
@@ -237,6 +261,7 @@ bool ApplyMorphState(WowObject* player) {
         }
     }
 
+    RestoreCollision(player);
     return changed;
 }
 
@@ -250,23 +275,31 @@ static int g_loginTicks = 0;
 void SoftResetState() {
     g_justLoggedIn = false;
 
-    // Clear captured originals so they get recaptured from new zone
-    g_origPetDisplay = 0; g_origHPetDisplay = 0;
-    g_origEnchantMH = 0; g_origEnchantOH = 0;
-    g_origTitle = 0;
-    g_origMount = 0; g_origDisplay = 0; g_origScale = 1.0f;
-    memset(g_origItems, 0, sizeof(g_origItems));
+    bool hasLocalMorph = (g_morphDisplay > 0) || (g_morphScale != 0.0f) || (g_morphMount > 0) ||
+        (g_morphPet > 0) || (g_morphHPet > 0) || (g_morphEnchantMH > 0) ||
+        (g_morphEnchantOH > 0) || (g_morphTitle > 0);
+    if (!hasLocalMorph) {
+        for (int s = 1; s <= 19; ++s) {
+            if (g_morphItems[s] > 0) {
+                hasLocalMorph = true;
+                break;
+            }
+        }
+    }
+    if (!hasLocalMorph) {
+        g_origPetDisplay = 0; g_origHPetDisplay = 0;
+        g_origEnchantMH = 0; g_origEnchantOH = 0;
+        g_origTitle = 0;
+        g_origMount = 0; g_origDisplay = 0; g_origScale = 1.0f;
+        memset(g_origItems, 0, sizeof(g_origItems));
+        g_saved = false;
+    }
 
     g_weaponRefreshTicks = 0;
     g_suspended = false;
-    g_saved = false;
-
-    // DON'T clear morph targets (g_morphMount, g_morphDisplay, etc.)
-    // DON'T clear g_hasMorph
-    // DON'T clear remote morphs — they'll get refreshed by P2P
 
     UpdateHasMorph(); // Recalculate from current morph targets
-    Log("Soft reset: originals cleared, morph targets preserved");
+    Log("Soft reset complete");
 }
 
 void ResetAllMorphs(bool forceClearOnly) {
@@ -348,7 +381,10 @@ void ResetAllMorphs(bool forceClearOnly) {
     
     // Update visual
     if (CGUnit_UpdateDisplayInfo) {
-        if (CGUnit_UpdateDisplayInfo) __try { CGUnit_UpdateDisplayInfo(player, 1); } __except(1) {}
+        if (CGUnit_UpdateDisplayInfo) __try { 
+            CGUnit_UpdateDisplayInfo(player, 1);
+            RestoreCollision(player); // Re-apply collision right after model update
+        } __except(1) {}
     }
 }
 
@@ -417,6 +453,7 @@ bool DoMorph(const char* cmd, WowObject* player) {
                 rm.titleId = 0;
                 memset(rm.items, 0, sizeof(rm.items));
                 memset(rm.unmorphRelease, 0, sizeof(rm.unmorphRelease));
+                rm.pendingClear = true;
                 Log("Remote GUID %llX: Reset requested", remoteGuid);
             }
             
@@ -451,7 +488,7 @@ bool DoMorph(const char* cmd, WowObject* player) {
                 *(uint32_t*)(desc + UNIT_FIELD_DISPLAYID) = id;
                 
                 if (CGUnit_UpdateDisplayInfo) {
-                    __try { CGUnit_UpdateDisplayInfo(player, 0); }
+                    __try { CGUnit_UpdateDisplayInfo(player, 0); RestoreCollision(player); }
                     __except(EXCEPTION_EXECUTE_HANDLER) { Log("UpdateDisplayInfo exception (actual)"); }
                 }
                 
@@ -748,6 +785,9 @@ bool DoMorph(const char* cmd, WowObject* player) {
                 rm.hPetScale = (float)hpsc100 / 100.0f;
                 rm.enchantMH = emh;
                 rm.enchantOH = eoh;
+                rm.pendingClear = false;
+                memset(rm.items, 0, sizeof(rm.items));
+                memset(rm.unmorphRelease, 0, sizeof(rm.unmorphRelease));
                 
                 // Parse items: slot=id-slot=id-...
                 char* next_item = nullptr;
@@ -769,13 +809,45 @@ bool DoMorph(const char* cmd, WowObject* player) {
     else if (strncmp(cmd, "PEER_CLEAR:", 11) == 0) {
         uint64_t guid = strtoull(cmd + 11, nullptr, 16);
         if (guid != 0) {
-            g_remoteMorphs.erase(guid);
-            Log("Remote GUID %llX: Peer cleared", guid);
+            auto it = g_remoteMorphs.find(guid);
+            if (it != g_remoteMorphs.end()) {
+                RemoteMorph& rm = it->second;
+                rm.displayId = 0;
+                rm.scale = 0.0f;
+                rm.enchantMH = 0;
+                rm.enchantOH = 0;
+                rm.mountId = 0;
+                rm.petId = 0;
+                rm.hPetId = 0;
+                rm.hPetScale = 0.0f;
+                rm.titleId = 0;
+                memset(rm.items, 0, sizeof(rm.items));
+                memset(rm.unmorphRelease, 0, sizeof(rm.unmorphRelease));
+                rm.pendingClear = true;
+                rm.lastSeen = GetTickCount64();
+            }
+            Log("Remote GUID %llX: Peer clear requested", guid);
         }
     }
     else if (strncmp(cmd, "PEER_CLEAR_ALL", 14) == 0) {
-        g_remoteMorphs.clear();
-        Log("All peers cleared");
+        uint64_t now = GetTickCount64();
+        for (auto& pair : g_remoteMorphs) {
+            RemoteMorph& rm = pair.second;
+            rm.displayId = 0;
+            rm.scale = 0.0f;
+            rm.enchantMH = 0;
+            rm.enchantOH = 0;
+            rm.mountId = 0;
+            rm.petId = 0;
+            rm.hPetId = 0;
+            rm.hPetScale = 0.0f;
+            rm.titleId = 0;
+            memset(rm.items, 0, sizeof(rm.items));
+            memset(rm.unmorphRelease, 0, sizeof(rm.unmorphRelease));
+            rm.pendingClear = true;
+            rm.lastSeen = now;
+        }
+        Log("All peers clear requested");
     }
 
     UpdateHasMorph();
@@ -988,6 +1060,8 @@ skip_character_morph:
         g_weaponRefreshTicks--;
         ReStampWeapons(player);
     }
+
+    RestoreCollision(player);
 }
 
 void GetNearbyPlayers(uint64_t playerGuid, char* outBuffer, size_t maxLen) {
@@ -1044,6 +1118,8 @@ void RemoteMorphGuard() {
     if (g_remoteMorphs.empty() || !IsInWorld()) return;
 
     uint64_t now = GetTickCount64();
+    uint64_t toErase[256] = {0};
+    int toEraseCount = 0;
     static uint64_t lastLogTime = 0;
     bool debugLog = (now - lastLogTime > 5000);
     if (debugLog) {
@@ -1060,9 +1136,19 @@ void RemoteMorphGuard() {
             uint8_t* desc = (uint8_t*)current->descriptors;
             bool changed = false;
 
-            // Apply DisplayID
-            if (rm.displayId > 0 && *(uint32_t*)(desc + UNIT_FIELD_DISPLAYID) != rm.displayId) {
-                *(uint32_t*)(desc + UNIT_FIELD_DISPLAYID) = rm.displayId;
+            if (rm.displayId > 0) {
+                uint32_t curDisplay = *(uint32_t*)(desc + UNIT_FIELD_DISPLAYID);
+                if (!rm.capturedDisplay) {
+                    rm.origDisplayId = curDisplay;
+                    rm.capturedDisplay = true;
+                }
+                if (curDisplay != rm.displayId) {
+                    *(uint32_t*)(desc + UNIT_FIELD_DISPLAYID) = rm.displayId;
+                    changed = true;
+                }
+            } else if (rm.displayId == 0 && rm.capturedDisplay) {
+                *(uint32_t*)(desc + UNIT_FIELD_DISPLAYID) = rm.origDisplayId;
+                rm.capturedDisplay = false;
                 changed = true;
             }
 
@@ -1085,21 +1171,35 @@ void RemoteMorphGuard() {
 
             // Apply Items
             for (int s = 1; s <= 19; s++) {
+                uint32_t off = GetVisibleItemField(s);
+                if (!off) {
+                    if (rm.unmorphRelease[s]) {
+                        rm.items[s] = 0;
+                        rm.unmorphRelease[s] = false;
+                    }
+                    continue;
+                }
                 if (rm.items[s] > 0) {
-                    uint32_t off = GetVisibleItemField(s);
-                    if (off) {
-                        uint32_t writeVal = rm.items[s];
-                        if (writeVal == 4294967295) writeVal = 0; // Explicit hide
-                        
-                        if (*(uint32_t*)(desc + off) != writeVal) {
-                            *(uint32_t*)(desc + off) = writeVal;
-                            changed = true;
-                        }
+                    if (!rm.capturedItems[s]) {
+                        rm.origItems[s] = *(uint32_t*)(desc + off);
+                        rm.capturedItems[s] = true;
+                    }
+                    uint32_t writeVal = rm.items[s];
+                    if (writeVal == 4294967295) writeVal = 0;
+                    if (*(uint32_t*)(desc + off) != writeVal) {
+                        *(uint32_t*)(desc + off) = writeVal;
+                        changed = true;
                     }
                     if (rm.unmorphRelease[s]) {
                         rm.items[s] = 0;
                         rm.unmorphRelease[s] = false;
                     }
+                } else if (rm.capturedItems[s]) {
+                    if (*(uint32_t*)(desc + off) != rm.origItems[s]) {
+                        *(uint32_t*)(desc + off) = rm.origItems[s];
+                        changed = true;
+                    }
+                    rm.capturedItems[s] = false;
                 }
             }
 
@@ -1243,7 +1343,29 @@ void RemoteMorphGuard() {
                     }
                 }
             }
+
+            if (rm.pendingClear) {
+                bool hasCaptured = rm.capturedDisplay || rm.capturedScale || rm.capturedEnchantMH || rm.capturedEnchantOH
+                    || rm.capturedMount || rm.capturedPet || rm.capturedHPet || rm.capturedHPetScale || rm.capturedTitle;
+                if (!hasCaptured) {
+                    for (int s = 1; s <= 19; ++s) {
+                        if (rm.capturedItems[s]) {
+                            hasCaptured = true;
+                            break;
+                        }
+                    }
+                }
+                if (!hasCaptured) {
+                    if (toEraseCount < 256) {
+                        toErase[toEraseCount++] = guid;
+                    }
+                }
+            }
         }
+    }
+
+    for (int i = 0; i < toEraseCount; ++i) {
+        g_remoteMorphs.erase(toErase[i]);
     }
 
     // Cleanup old remote morphs (10 minute timeout)

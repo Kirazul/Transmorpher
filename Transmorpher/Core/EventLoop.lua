@@ -26,8 +26,6 @@ mainFrame:RegisterEvent("BARBER_SHOP_CLOSE")
 
 -- State tracking
 local lastKnownForm = -1
--- State tracking
-local lastKnownForm = -1
 local lastMainHand, lastOffHand = nil, nil
 local lastDBWActive = false
 
@@ -88,80 +86,15 @@ ns.currentFormMorph = nil
 ns.formMorphRuntimeActive = false
 local lastFormMorphApplyAt = 0
 
-local formRecheckFrame = CreateFrame("Frame")
-formRecheckFrame:Hide()
-formRecheckFrame.remaining = 0
-formRecheckFrame.interval = 0.06
-formRecheckFrame.elapsed = 0
-formRecheckFrame:SetScript("OnUpdate", function(self, dt)
-    self.remaining = self.remaining - dt
-    self.elapsed = self.elapsed + dt
-    if self.elapsed >= self.interval then
-        self.elapsed = 0
-        ns.CheckFormMorphs()
-    end
-    if self.remaining <= 0 then
-        self:Hide()
-    end
-end)
-
+-- Logic for scheduling rechecks removed to favor single-shot application events.
 local function ScheduleFormRecheck(duration, interval)
-    formRecheckFrame.remaining = duration or 0.7
-    formRecheckFrame.interval = interval or 0.06
-    formRecheckFrame.elapsed = 0
-    formRecheckFrame:Show()
+    -- No-op for cleanup
 end
 
-local formBurstFrame = CreateFrame("Frame")
-formBurstFrame:Hide()
-formBurstFrame.displayID = nil
-formBurstFrame.elapsed = 0
-formBurstFrame.interval = 0.04
-formBurstFrame.shotsLeft = 0
-formBurstFrame:SetScript("OnUpdate", function(self, dt)
-    if not self.displayID or self.shotsLeft <= 0 then
-        self:Hide()
-        return
-    end
-    self.elapsed = self.elapsed + dt
-    if self.elapsed < self.interval then return end
-    self.elapsed = 0
-    -- Cancel burst if vehicle entered
-    if ns.vehicleSuspended then
-        self:Hide(); self.displayID = nil; self.shotsLeft = 0
-        return
-    end
-    -- Cancel burst if the active form morph changed (form switched or buff expired)
-    if ns.currentFormMorph ~= self.displayID then
-        self:Hide(); self.displayID = nil; self.shotsLeft = 0
-        return
-    end
-    local needResume = false
-    if ns.dbwSuspended then
-        needResume = true; ns.dbwSuspended = false
-    end
-    if ns.morphSuspended and not ns.vehicleSuspended then
-        needResume = true; ns.morphSuspended = false
-    end
-    if needResume then
-        ns.SendRawMorphCommand("RESUME|MORPH:" .. self.displayID)
-    else
-        ns.SendRawMorphCommand("MORPH:" .. self.displayID)
-    end
-    self.shotsLeft = self.shotsLeft - 1
-    lastFormMorphApplyAt = GetTime()
-    if self.shotsLeft <= 0 then
-        self:Hide()
-    end
-end)
-
-local function StartFormBurst(displayID)
+local function StartFormMorph(displayID)
     if not displayID then return end
-    formBurstFrame.displayID = displayID
-    formBurstFrame.elapsed = 0
-    formBurstFrame.interval = 0.04
-    formBurstFrame.shotsLeft = 3
-    formBurstFrame:Show()
+    -- Apply morph once
+    ApplyTemporaryFormMorph(displayID)
 end
 
 local function ResolveAssignedMorphForSpell(spellID)
@@ -260,12 +193,9 @@ local function RestoreBaseMorphAfterForm()
     end
 end
 
-function ns.CheckFormMorphs()
+function ns.CheckFormMorphs(forceApply)
     -- Vehicle takes absolute priority — kill all form morphing
     if ns.vehicleSuspended then
-        if formBurstFrame:IsShown() then
-            formBurstFrame:Hide(); formBurstFrame.displayID = nil; formBurstFrame.shotsLeft = 0
-        end
         if ns.formMorphRuntimeActive then
             ns.formMorphRuntimeActive = false
             ns.currentFormMorph = nil
@@ -279,20 +209,9 @@ function ns.CheckFormMorphs()
     local morphChanged = (newMorph ~= ns.currentFormMorph)
 
     if newMorph then
-        -- If morph changed, cancel any running burst for the OLD morph first
-        if morphChanged then
-            if formBurstFrame:IsShown() then
-                formBurstFrame:Hide(); formBurstFrame.displayID = nil; formBurstFrame.shotsLeft = 0
-            end
+        -- Apply if the morph changed, wasn't active, or we are forcing a fix for a model slip
+        if morphChanged or not ns.formMorphRuntimeActive or forceApply then
             ApplyTemporaryFormMorph(newMorph)
-            StartFormBurst(newMorph)
-        elseif not ns.formMorphRuntimeActive then
-            ApplyTemporaryFormMorph(newMorph)
-            StartFormBurst(newMorph)
-        elseif (GetTime() - lastFormMorphApplyAt) > 0.35 then
-            -- Periodic re-enforcement to prevent leaking
-            ns.SendRawMorphCommand("MORPH:" .. newMorph)
-            lastFormMorphApplyAt = GetTime()
         end
         ns.currentFormMorph = newMorph
         ns.formMorphRuntimeActive = true
@@ -301,10 +220,6 @@ function ns.CheckFormMorphs()
     end
 
     -- No form morph needed — clean up
-    if formBurstFrame:IsShown() then
-        formBurstFrame:Hide(); formBurstFrame.displayID = nil; formBurstFrame.shotsLeft = 0
-    end
-
     if ns.formMorphRuntimeActive then
         RestoreBaseMorphAfterForm()
     end
@@ -389,17 +304,23 @@ mainFrame:SetScript("OnEvent", function(self, event, ...)
         ScheduleMorphSend(0.4)
         ns.RestoreMorphedUI()
 
-        -- Multiplayer Sync
-        if ns.BroadcastMorphState then ns.BroadcastMorphState(true) end
-        
-        -- Join Sync Channel
-        JoinChannelByName("TransmorpherSync")
+        local settings = ns.GetSettings()
+        local syncActive = settings.enableWorldSync
+        if ns.P2PSetEnabled then
+            ns.P2PSetEnabled(syncActive)
+        end
+        if syncActive and ns.BroadcastMorphState then
+            ns.BroadcastMorphState(true)
+        end
     elseif event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
         lastKnownForm = GetShapeshiftForm()
         lastKnownMounted = IsMounted() or false
         
-        ns.CheckFormMorphs()
-        ScheduleFormRecheck(0.8, 0.06)
+        -- Staggered form check for speed and safety
+        ns.TimerAfter(0.5, function()
+            ns.CheckFormMorphs()
+            ScheduleFormRecheck(0.8, 0.06)
+        end)
 
         if not ns.currentFormMorph then
             ns.morphSuspended = ns.IsModelChangingForm()
@@ -415,21 +336,11 @@ mainFrame:SetScript("OnEvent", function(self, event, ...)
             if ns.morphSuspended or ns.dbwSuspended or ns.vehicleSuspended then
                 ns.SendRawMorphCommand("SUSPEND")
             else
-                ScheduleMorphSend(0.05)
+                ScheduleMorphSend(0.3) -- More responsive (300ms) but still gives breathing room
             end
         end
 
-        -- Auto-switch ground/flying mount morph based on zone
-        local flyableNow = ns.IsFlyableZone and ns.IsFlyableZone() or false
-        if flyableNow ~= lastFlyableState then
-            lastFlyableState = flyableNow
-            if TransmorpherCharacterState and ns.GetAutoMountDisplay then
-                local autoMount = ns.GetAutoMountDisplay()
-                if autoMount and autoMount > 0 and ns.IsMorpherReady() then
-                    ns.SendRawMorphCommand("MOUNT_MORPH:" .. autoMount)
-                end
-            end
-        end
+
 
         if TransmorpherCharacterState and TransmorpherCharacterState.WorldTime then
             ns.SendMorphCommand("TIME:"..TransmorpherCharacterState.WorldTime)
@@ -445,10 +356,16 @@ mainFrame:SetScript("OnEvent", function(self, event, ...)
         -- Environmental trigger handled by MountManager
     elseif event == "UPDATE_SHAPESHIFT_FORM" then
         local currentForm = GetShapeshiftForm()
-        -- if currentForm == lastKnownForm then return end -- Force check for custom morphs even if index same (e.g. reload)
+        if currentForm == lastKnownForm then return end
         lastKnownForm = currentForm
-        ns.CheckFormMorphs()
-        ScheduleFormRecheck(0.7, 0.05)
+        
+        -- 1. Instant Apply
+        ns.CheckFormMorphs(true)
+        
+        -- 2. Safety Window: Re-apply 200ms later to handle slow model loading
+        ns.TimerAfter(0.2, function()
+            ns.CheckFormMorphs(true)
+        end)
         
     elseif event == "UNIT_AURA" then
         local unit = ...
@@ -479,18 +396,22 @@ mainFrame:SetScript("OnEvent", function(self, event, ...)
     elseif event == "UNIT_MODEL_CHANGED" then
         local unit = ...
         if unit ~= "player" then return end
+        
+        -- Instant Correction with Throttle: If the game resets our model while in form, fix it instantly.
+        -- Throttle to 1.5s to avoid the 'infinite loop flickering' caused by the morph itself triggering this event.
+        if GetShapeshiftForm() > 0 then
+            local now = GetTime()
+            lastFormFixAt = lastFormFixAt or 0
+            if (now - lastFormFixAt) > 1.5 then
+                lastFormFixAt = now
+                ns.CheckFormMorphs(true)
+            end
+        end
+        
         local curMounted = IsMounted() or false
         if curMounted ~= lastKnownMounted then
             lastKnownMounted = curMounted
-            -- Player just mounted: apply ground/flying auto-switch based on mount type
-            if curMounted and TransmorpherCharacterState and ns.GetAutoMountDisplay then
-                local settings = ns.GetSettings()
-                if settings.saveMountMorph then
-                    -- Small delay to let mount aura register for spell detection
-                    mountAutoSwitchFrame.elapsed = 0
-                    mountAutoSwitchFrame:Show()
-                end
-            end
+            -- Handled by MountManager.lua
         end
 
     elseif event == "UNIT_INVENTORY_CHANGED" then

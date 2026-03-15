@@ -57,6 +57,9 @@ struct RemoteMorph {
     bool capturedHPet = false; uint32_t origHPetId = 0;
     bool capturedHPetScale = false; float origHPetScale = 1.0f;
     bool capturedTitle = false; uint32_t origTitleId = 0;
+    bool capturedDisplay = false; uint32_t origDisplayId = 0;
+    bool capturedItems[20] = {false}; uint32_t origItems[20] = {0};
+    bool pendingClear = false;
     uint64_t lastSeen = 0;
     bool unmorphRelease[20] = {false};
 };

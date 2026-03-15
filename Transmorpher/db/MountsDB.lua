@@ -16,7 +16,7 @@ ns.mountsDB = {
     { "Pinto",                          472,    2409,   "Creature\\Horse\\Horse.m2", "G" },
     { "Palomino",                       16082,  2408,   "Creature\\Horse\\Horse.m2", "G" },
     { "White Stallion",                 468,    2410,   "Creature\\Horse\\Horse.m2", "G" },
-    { "Swift Brown Steed",              23229,  14583,  "Creature\\Horse\\Horse.m2", "G" },
+    { "Swift Brown Steed",              23229,  14583,  "Creature\ \Horse\\Horse.m2", "G" },
     { "Swift Palomino",                 23227,  14582,  "Creature\\Horse\\Horse.m2", "G" },
     { "Swift White Steed",              23228,  14338,  "Creature\\Horse\\Horse.m2", "G" },
 

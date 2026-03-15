@@ -218,48 +218,77 @@ do
 
     btn:SetScript("OnClick", function()
         if ns.IsMorpherReady() then
-            ns.SendMorphCommand("RESET:ALL")
-            -- Clear mount morphs
+            -- Force a comprehensive reset command sequence
+            ns.SendMorphCommand("RESET:ALL|MOUNT_RESET|HPET_RESET|PET_RESET|TITLE_RESET|ENCHANT_RESET")
+            
+            -- Explicitly wipe all saved character state
             if TransmorpherCharacterState then
+                if TransmorpherCharacterState.Items then wipe(TransmorpherCharacterState.Items) end
+                if TransmorpherCharacterState.HiddenItems then wipe(TransmorpherCharacterState.HiddenItems) end
+                if TransmorpherCharacterState.Mounts then wipe(TransmorpherCharacterState.Mounts) end
+                if TransmorpherCharacterState.WeaponSets then wipe(TransmorpherCharacterState.WeaponSets) end
+                TransmorpherCharacterState.Morph = nil
+                TransmorpherCharacterState.Scale = nil
+                TransmorpherCharacterState.MountDisplay = nil
+                TransmorpherCharacterState.MountHidden = false
+                TransmorpherCharacterState.PetDisplay = nil
+                TransmorpherCharacterState.HunterPetDisplay = nil
+                TransmorpherCharacterState.HunterPetScale = nil
+                TransmorpherCharacterState.EnchantMH = nil
+                TransmorpherCharacterState.EnchantOH = nil
+                TransmorpherCharacterState.TitleID = nil
                 TransmorpherCharacterState.GroundMountDisplay = nil
                 TransmorpherCharacterState.GroundMountName = nil
                 TransmorpherCharacterState.FlyingMountDisplay = nil
                 TransmorpherCharacterState.FlyingMountName = nil
-                TransmorpherCharacterState.MountDisplay = nil
-                TransmorpherCharacterState.MountHidden = false
-                if TransmorpherCharacterState.Mounts then
-                    wipe(TransmorpherCharacterState.Mounts)
-                end
             end
-            ns.SendRawMorphCommand("MOUNT_RESET")
+
+            -- Update all UI slots to reflect real equipped items
             for _, slotName in pairs(ns.slotOrder) do
                 local slot = mainFrame.slots[slotName]
-                slot.isMorphed = false; slot.morphedItemId = nil; slot.isHiddenSlot = false
-                ns.HideMorphGlow(slot)
-                if slot.eyeButton then
-                    slot.eyeButton.isHidden = false
-                    if slot.eyeButton.UpdateVisuals then
-                        slot.eyeButton:UpdateVisuals()
+                if slot then
+                    slot.isMorphed = false
+                    slot.morphedItemId = nil
+                    slot.isHiddenSlot = false
+                    ns.HideMorphGlow(slot)
+                    if slot.eyeButton then
+                        slot.eyeButton.isHidden = false
+                        if slot.eyeButton.UpdateVisuals then slot.eyeButton:UpdateVisuals() end
+                    end
+                    
+                    -- Re-fetch real equipment
+                    if slotName == ns.rangedSlot and ("DRUIDSHAMANPALADINDEATHKNIGHT"):find(ns.playerClass) then
+                        slot:RemoveItem()
+                    else
+                        local equippedId = ns.GetEquippedItemForSlot(slotName)
+                        if equippedId then slot:SetItem(equippedId)
+                        else slot:RemoveItem() end
                     end
                 end
-                if slotName == ns.rangedSlot and ("DRUIDSHAMANPALADINDEATHKNIGHT"):find(ns.playerClass) then
-                    -- skip
-                else
-                    local equippedId = ns.GetEquippedItemForSlot(slotName)
-                    if equippedId then slot:SetItem(equippedId)
-                    else slot.itemId = nil; slot.textures.empty:Show(); slot.textures.item:Hide() end
+            end
+
+            -- Reset special slots (Mount/Pet/etc)
+            if mainFrame.specialSlots then
+                for _, s in pairs(mainFrame.specialSlots) do
+                    s.displayID = nil
+                    s.name = nil
+                    if s.icon then s.icon:Hide() end
+                    ns.HideMorphGlow(s)
                 end
             end
+
             if mainFrame.enchantSlots then
                 for _, es in pairs(mainFrame.enchantSlots) do
                     es.isMorphed = false; es:RemoveEnchant(); ns.HideMorphGlow(es)
                 end
             end
+
+            -- Refresh 3D preview and status
             ns.SyncDressingRoom()
-            if ns.BroadcastMorphState then
-                ns.BroadcastMorphState(true)
-            end
-            SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: All morphs reset!")
+            if ns.UpdateMorphStatusBar then ns.UpdateMorphStatusBar() end
+            if ns.BroadcastMorphState then ns.BroadcastMorphState(true) end
+            
+            SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: All morphs hard reset!")
         end
         PlaySound("gsTitleOptionOK")
     end)

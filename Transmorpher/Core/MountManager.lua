@@ -81,39 +81,10 @@ function MM.ApplyCorrectMorph(isMounting, forcedSpellID)
         return
     end
 
-    if isMounting then
-        TMLog("Applying morph burst for " .. targetID)
-        MM.burstShots = 8 
-        MM.burstID = targetID
-        MM.burstFrame:Show()
-    else
-        TMLog("Applying morph update: " .. targetID)
-        ns.SendRawMorphCommand("MOUNT_MORPH:" .. targetID)
-    end
+    -- Single shot application
+    TMLog("Applying mount morph: " .. targetID)
+    ns.SendRawMorphCommand("MOUNT_MORPH:" .. targetID)
 end
-
--- ============================================================
--- BURST SENDING
--- Ensures the displayID is written while the client is building the mount model.
--- ============================================================
-
-MM.burstFrame = CreateFrame("Frame")
-MM.burstFrame:Hide()
-MM.burstFrame.elapsed = 0
-MM.burstID = 0
-MM.burstShots = 0
-MM.burstFrame:SetScript("OnUpdate", function(self, dt)
-    self.elapsed = self.elapsed + dt
-    if self.elapsed < 0.05 then return end
-    self.elapsed = 0
-    
-    if MM.burstShots > 0 then
-        ns.SendRawMorphCommand("MOUNT_MORPH:" .. MM.burstID)
-        MM.burstShots = MM.burstShots - 1
-    else
-        self:Hide()
-    end
-end)
 
 -- ============================================================
 -- EVENT HANDLING
@@ -130,7 +101,10 @@ MM.eventFrame:SetScript("OnEvent", function(self, event, ...)
     local unit = ...
     
     if event == "PLAYER_ENTERING_WORLD" or event == "SPELLS_CHANGED" then
-        MM.ApplyCorrectMorph(false) -- Initial pre-load
+        -- Safety: avoid hitting the DLL immediately on load
+        ns.TimerAfter(0.7, function()
+            MM.ApplyCorrectMorph(false)
+        end)
     end
 
     if not TransmorpherCharacterState then return end
@@ -144,7 +118,7 @@ MM.eventFrame:SetScript("OnEvent", function(self, event, ...)
             end
             
             if spellID and ns.mountSpellLookup and ns.mountSpellLookup[spellID] then
-                TMLog("Mount cast detected: " .. spellID .. ". Applying morph.")
+                TMLog("Mount cast detected: " .. spellID .. ". Starting burst.")
                 MM.ApplyCorrectMorph(true, spellID) 
             end
         end
@@ -157,7 +131,18 @@ MM.eventFrame:SetScript("OnEvent", function(self, event, ...)
         TMLog("Mount state change: " .. tostring(MM.lastMountedState) .. " -> " .. tostring(currentMounted))
         MM.lastMountedState = currentMounted
         if currentMounted then
+            -- Trigger a fresh burst when the mount state actually switches to true
             MM.ApplyCorrectMorph(true)
+        end
+    elseif currentMounted and event == "UNIT_MODEL_CHANGED" and unit == "player" then
+        -- Safety Refresh: If the model is forced to change while already mounted.
+        -- Throttle to once every 2 seconds to avoid Error 132 during rapid transitions.
+        local now = GetTime()
+        MM.lastModelRefresh = MM.lastModelRefresh or 0
+        if (now - MM.lastModelRefresh) > 2.0 then
+            MM.lastModelRefresh = now
+            TMLog("Safety refresh triggered for player model change while mounted.")
+            MM.ApplyCorrectMorph(false)
         end
     end
 end)

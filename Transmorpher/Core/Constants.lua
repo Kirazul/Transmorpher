@@ -5,7 +5,7 @@ local addon, ns = ...
 -- Centralized color palette, dimensions, slot data, race data
 -- ============================================================
 
-ns.VERSION = "1.1.6"
+ns.VERSION = "1.1.7"
 ns.ADDON_PREFIX = "Transmorpher"
 
 -- ============================================================
@@ -244,7 +244,6 @@ ns.defaultSettings = {
     morphInShapeshift = false,
     worldTime = nil,
     enableWorldSync = true,
-    limitToGroup = false,
     maxVisiblePlayers = 0,
     showMinimapButton = true,
     hidePaperdollButton = false,
@@ -320,6 +319,7 @@ ns.vehicleKeywords = {
     "Blimp", "Balloon", "Gnome", "Goblin", "Experimental", "Security",
     "Defense", "Assault", "War", "Combat", "Battle", "Transport", "Portal",
     "Focus", "Nexus", "Pulse", "Energy", "Beam", "Static", "Launcher", "Ram",
+    "Archmage", "Pentarus", "Summon", "Teleport", "Taxi", "Travel",
     "Stabled Thunder Bluff Kodo", "Stabled Darkspear Raptor", "Stabled Forsaken Warhorse",
     "Stabled Orgrimmar Wolf", "Stabled Silvermoon Hawkstrider", "Stabled Sunreaver Hawkstrider",
     "Stabled Argent Warhorse",

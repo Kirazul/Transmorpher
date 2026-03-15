@@ -103,7 +103,7 @@ mainFrame.specialSlots.CombatPet = CreateSpecialSlot("Combat Pet", 5, "Interface
 mainFrame.specialSlots.MorphForm = CreateSpecialSlot("Morph Form", 6, "Interface\\Icons\\Spell_Shadow_Charm")
 
 -- Position: Single Mount slot centered below Feet slot
-mainFrame.specialSlots.Mount:SetPoint("TOP", mainFrame.slots["Feet"], "BOTTOM", 0, -20)
+mainFrame.specialSlots.Mount:SetPoint("TOP", mainFrame.slots["Feet"], "BOTTOM", 0, -30)
 mainFrame.specialSlots.Pet:SetPoint("TOP", mainFrame.specialSlots.Mount, "BOTTOM", 0, -6)
 mainFrame.specialSlots.CombatPet:SetPoint("TOP", mainFrame.specialSlots.Pet, "BOTTOM", 0, -4)
-mainFrame.specialSlots.MorphForm:SetPoint("TOP", mainFrame.specialSlots.CombatPet, "BOTTOM", 0, -4)
+mainFrame.specialSlots.MorphForm:SetPoint("TOP", mainFrame.specialSlots.CombatPet, "BOTTOM", 0, -16)

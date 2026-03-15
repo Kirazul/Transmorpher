@@ -18,6 +18,31 @@ function ns.ArrayHasValue(array, value)
     return false
 end
 
+-- ============================================================
+-- TIMER HELPER
+-- Polyfill for C_Timer.After (not available in some classic/3.3.5a clients)
+-- ============================================================
+local activeTimers = {}
+local timerFrame = CreateFrame("Frame")
+timerFrame:SetScript("OnUpdate", function(self, elapsed)
+    if #activeTimers == 0 then return end
+    for i = #activeTimers, 1, -1 do
+        local t = activeTimers[i]
+        t.remaining = t.remaining - elapsed
+        if t.remaining <= 0 then
+            local callback = t.callback
+            table.remove(activeTimers, i)
+            callback()
+        end
+    end
+end)
+
+function ns.TimerAfter(delay, callback)
+    if not callback then return end
+    if delay <= 0 then callback(); return end
+    table.insert(activeTimers, { remaining = delay, callback = callback })
+end
+
 function ns.GetSpellIcon(spellID)
     if spellID and spellID > 0 then
         local _, _, icon = GetSpellInfo(spellID)

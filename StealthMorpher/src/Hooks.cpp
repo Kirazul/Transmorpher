@@ -100,6 +100,7 @@ extern bool g_suspended;
 extern uint32_t g_morphDisplay;
 extern uint32_t g_morphItems[20];
 extern float g_morphScale;
+extern float g_origScale;
 extern uint32_t g_morphEnchantMH;
 extern uint32_t g_morphEnchantOH;
 
@@ -161,6 +162,25 @@ void __declspec(naked) MountDisplayHook()
         jmp do_original
 
     check_display_id:
+        // --- CHECK 1.4: Object Scale (Index 4) ---
+        cmp edx, 4
+        jne check_display_id_real
+
+        // If g_morphScale is active (>0.0), use it.
+        // Otherwise, if we have an active morph (g_morphDisplay > 0), 
+        // we force the scale to stay at g_origScale to prevent "metrix/geometry" changes.
+        cmp dword ptr [g_morphScale], 0
+        je check_freeze_scale
+        mov ecx, dword ptr [g_morphScale]
+        jmp do_original
+
+    check_freeze_scale:
+        cmp dword ptr [g_morphDisplay], 0
+        je do_original
+        mov ecx, dword ptr [g_origScale]
+        jmp do_original
+
+    check_display_id_real:
         // --- CHECK 1.5: Display ID (0x43) ---
         cmp edx, 0x43 // UNIT_FIELD_DISPLAYID
         jne check_items

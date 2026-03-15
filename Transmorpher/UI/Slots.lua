@@ -205,29 +205,25 @@ for slotName, texturePath in pairs(ns.slotTextures) do
 
     slot:SetScript("OnClick", function(self, button)
         if button == "LeftButton" and IsAltKeyDown() and self.itemId and ns.slotToEquipSlotId[self.slotName] then
-            if ns.IsMorpherReady() then
-                local didChange = false
-                local equippedId = ns.GetEquippedItemForSlot(self.slotName)
-                if equippedId and equippedId == self.itemId then
-                    self.isMorphed = false; self.morphedItemId = nil
-                    ns.HideMorphGlow(self)
-                    SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: "..self.slotName.." already equipped.")
-                else
-                    ns.SendMorphCommand("ITEM:"..ns.slotToEquipSlotId[self.slotName]..":"..self.itemId)
-                    didChange = true
-                    self.isMorphed = true; self.morphedItemId = self.itemId
-                    SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Morphed "..self.slotName.."!")
-                    ns.FlashMorphSlot(self)
-                end
-                if didChange then
-                    local equipSlotId = ns.slotToEquipSlotId[self.slotName]
-                    if equipSlotId ~= 16 and equipSlotId ~= 17 and equipSlotId ~= 18 then
-                        if ns.ScheduleDressingRoomSync then ns.ScheduleDressingRoomSync(0.05)
-                        elseif ns.SyncDressingRoom then ns.SyncDressingRoom() end
-                    end
-                end
+            local didChange = false
+            local equippedId = ns.GetEquippedItemForSlot(self.slotName)
+            if equippedId and equippedId == self.itemId then
+                self.isMorphed = false; self.morphedItemId = nil
+                ns.HideMorphGlow(self)
+                SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: "..self.slotName.." already equipped.")
             else
-                SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: |cffff0000DLL not loaded!|r")
+                ns.SendMorphCommand("ITEM:"..ns.slotToEquipSlotId[self.slotName]..":"..self.itemId)
+                didChange = true
+                self.isMorphed = true; self.morphedItemId = self.itemId
+                SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Morphed "..self.slotName.."!")
+                ns.FlashMorphSlot(self)
+            end
+            if didChange then
+                local equipSlotId = ns.slotToEquipSlotId[self.slotName]
+                if equipSlotId ~= 16 and equipSlotId ~= 17 and equipSlotId ~= 18 then
+                    if ns.ScheduleDressingRoomSync then ns.ScheduleDressingRoomSync(0.05)
+                    elseif ns.SyncDressingRoom then ns.SyncDressingRoom() end
+                end
             end
             PlaySound("gsTitleOptionOK"); return
         end

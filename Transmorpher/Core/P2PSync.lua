@@ -42,6 +42,7 @@ local MSG_REQUEST        = "R"
 
 local SYNC_CHANNEL_NAME  = "TransmorpherSync"
 local syncChannelId      = nil
+local SendAddon = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
 
 -- Adaptive heartbeat interval based on active peer count
 local function GetHeartbeatInterval()
@@ -67,6 +68,7 @@ local lastBroadcastBody = nil  -- our own last broadcast body (self dedup)
 local lastHeartbeat     = 0
 local myGUIDHex         = nil  -- cached after first UnitGUID call
 ns.p2pDebug           = false -- toggle with /morph debug
+local discoverDebounce  = {}
 
 -- ----------------------------------------------------------------
 -- Register prefix so WoW routes CHAT_MSG_ADDON to us
@@ -102,25 +104,104 @@ local function P2PLogChannels()
 end
 ns.P2PLogChannels = P2PLogChannels
 
+-- Track recent whisper targets to filter out system spam
+local recentWhispers = {}
+local function AddRecentWhisper(target)
+     if not target then return end
+     recentWhispers[target] = GetTime()
+     
+     -- Periodic cleanup of old entries
+     local now = GetTime()
+     for name, t in pairs(recentWhispers) do
+         if (now - t) > 10 then
+             recentWhispers[name] = nil
+         end
+     end
+ end
+
+local function IsRecentWhisper(target)
+    if not target then return false end
+    local now = GetTime()
+    for name, t in pairs(recentWhispers) do
+        if (now - t) < 5.0 then
+              if name == target or target:sub(1, #name + 1) == name .. "-" then
+                  return true
+              end
+          end
+    end
+    return false
+end
+
+local function NormalizeSyncChatMessage(msg)
+    if not msg then return "" end
+    local normalized = msg:gsub("^%s+", "")
+    local pTag = "<" .. PREFIX .. ">"
+    if normalized:sub(1, #pTag) == pTag then
+        normalized = normalized:sub(#pTag + 1)
+        if normalized:sub(1, 1) == "|" then
+            normalized = normalized:sub(2)
+        end
+    elseif normalized:sub(1, 8) == "TM_SYNC:" then
+        normalized = normalized:sub(9)
+    end
+    return normalized
+end
+
+local function IsSyncChatPayload(msg)
+    if not msg then return false end
+    -- Robust check: skip leading spaces/newlines then check for our tags
+    local clean = msg:gsub("^%s+", "")
+    local pTag = "<" .. PREFIX .. ">"
+    
+    -- Exact prefix match or contains custom channel prefix
+    if clean:sub(1, #pTag) == pTag then return true end
+    if clean:sub(1, 8) == "TM_SYNC:" then return true end
+    
+    -- Fallback: if tag appears anywhere in the first 20 chars (for color-coded servers)
+    if msg:find(pTag, 1, true) and msg:find(pTag, 1, true) <= 20 then return true end
+    if msg:find("TM_SYNC:", 1, true) and msg:find("TM_SYNC:", 1, true) <= 20 then return true end
+    
+    return false
+end
+
 -- Chat filter to hide the custom sync channel messages and fallback whispers from the UI
 if ChatFrame_AddMessageEventFilter then
-    local function FilterTM(self, event, msg, ...)
+    local function FilterTM(self, event, msg, sender)
         if msg then
-            local pTag = "<" .. PREFIX .. ">"
-            if msg:sub(1, #pTag) == pTag then return true end
-            if msg:sub(1, 8) == "TM_SYNC:" then return true end
+            if IsSyncChatPayload(msg) then return true end
+            -- Catch AFK/DND messages from the person we just whispered
+            if (event == "CHAT_MSG_AFK" or event == "CHAT_MSG_DND") and sender then
+                if IsRecentWhisper(sender) then
+                    return true
+                end
+            end
         end
         return false
     end
     ChatFrame_AddMessageEventFilter("CHAT_MSG_CHANNEL", FilterTM)
     ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", FilterTM)
     ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", FilterTM)
+    ChatFrame_AddMessageEventFilter("CHAT_MSG_BN_WHISPER", FilterTM)
+    ChatFrame_AddMessageEventFilter("CHAT_MSG_BN_WHISPER_INFORM", FilterTM)
+    ChatFrame_AddMessageEventFilter("CHAT_MSG_AFK", FilterTM)
+    ChatFrame_AddMessageEventFilter("CHAT_MSG_DND", FilterTM)
 
-    -- Hide "No player named 'XYZ' is currently playing" if the whisper fails (e.g. cross-faction)
+    -- Hide "No player named 'XYZ' is currently playing" and AFK auto-replies
     ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", function(self, event, msg, ...)
-        if msg and ns.lastP2PWhisperTarget and ns.lastP2PWhisperTime and (GetTime() - ns.lastP2PWhisperTime < 1.0) then
-            local expectedErr = string.format(ERR_CHAT_PLAYER_NOT_FOUND_S, ns.lastP2PWhisperTarget)
-            if msg == expectedErr then return true end
+        if msg then
+            -- Check all recent whisper targets
+            local now = GetTime()
+            for target, t in pairs(recentWhispers) do
+                if (now - t) < 5.0 then
+                    -- Fallback check for AFK/DND system messages
+                    if msg:find(target) and (msg:find("Away from Keyboard") or msg:find("Do Not Disturb")) then
+                        return true
+                    end
+                    
+                    local expectedErr = string.format(ERR_CHAT_PLAYER_NOT_FOUND_S, target)
+                    if msg == expectedErr then return true end
+                end
+            end
         end
         return false
     end)
@@ -138,6 +219,19 @@ local function GetMyGUIDHex()
     return myGUIDHex
 end
 
+
+
+local function TrySendAddon(msgPrefix, payload, channel, target)
+    if not SendAddon then return false end
+    local ok
+    if target then
+        ok = pcall(SendAddon, msgPrefix, payload, channel, target)
+    else
+        ok = pcall(SendAddon, msgPrefix, payload, channel)
+    end
+    return ok == true
+end
+
 -- ================================================================
 -- LOW-LEVEL SEND HELPERS
 -- ================================================================
@@ -148,17 +242,15 @@ end
 local function SendToGroupAndGuild(msg, useChannel)
     local sentGroup = false
     if IsInRaid() then
-        SendAddonMessage(PREFIX, msg, "RAID")
-        sentGroup = true
+        sentGroup = TrySendAddon(PREFIX, msg, "RAID") or sentGroup
     elseif IsInGroup() then
-        SendAddonMessage(PREFIX, msg, "PARTY")
-        sentGroup = true
+        sentGroup = TrySendAddon(PREFIX, msg, "PARTY") or sentGroup
     end
     if IsInGuild() then
-        SendAddonMessage(PREFIX, msg, "GUILD")
+        TrySendAddon(PREFIX, msg, "GUILD")
     end
     
-    -- Non-group sync: ONLY broadcast discovery/clear to custom channel
+    -- Non-group sync: broadcast discovery/clear to custom channel
     if useChannel and ns.p2pEnabled then
         syncChannelId = GetChannelName(SYNC_CHANNEL_NAME)
         if not syncChannelId or syncChannelId == 0 then
@@ -181,26 +273,93 @@ local function SendToGroupAndGuild(msg, useChannel)
 end
 
 --- Whisper a specific player. pcall so it never raises an error.
-local function WhisperPlayer(msg, target)
+local InOurGroup
+--- Find a peer's full name from the peer table using a normalized match.
+local function GetPeerFullName(target)
+    if not target or target == "" then return nil end
+    if ns.p2pPeers[target] then return target end
+    
+    local normTarget = NormalizePlayerName(target)
+    if normTarget == "" then return nil end
+    
+    for peerName, _ in pairs(ns.p2pPeers) do
+        if NormalizePlayerName(peerName) == normTarget then
+            return peerName
+        end
+    end
+    return nil
+end
+
+local function WhisperPlayer(msg, target, force)
     if not ns.p2pEnabled or not msg or msg == ""
        or not target or target == "" then return end
     
+    -- Only whisper if they are already a known peer (confirmed addon user),
+    -- or if we are explicitly forced to (e.g. initial discovery probes)
+    local fullName = GetPeerFullName(target)
+    if not force and not fullName then return end
+
+    local finalTarget = fullName or target
     local wireMsg = msg:gsub("|", "||")
-    P2PLog("Whispering state to: %s [Payload: %s]", target, wireMsg:sub(1, 40) .. "...")
     
-    ns.lastP2PWhisperTarget = target
-    ns.lastP2PWhisperTime = GetTime()
+    AddRecentWhisper(finalTarget)
     
-    pcall(SendAddonMessage, PREFIX, wireMsg, "WHISPER", target)
+    TrySendAddon(PREFIX, wireMsg, "WHISPER", finalTarget)
     -- Fallback for servers that block addon whispers
-    pcall(SendChatMessage, "<" .. PREFIX .. ">" .. wireMsg, "WHISPER", nil, target)
+    -- HIDDEN: Disabling visible SendChatMessage whispers to ensure complete invisibility for everyone.
+    -- If a server strictly blocks addon-messages, sync will rely on the custom channel instead.
+    -- pcall(SendChatMessage, "<" .. PREFIX .. ">" .. wireMsg, "WHISPER", nil, finalTarget)
 end
 
 --- True if player name is covered by our current group channel.
-local function InOurGroup(name)
-    if IsInRaid()  and UnitInRaid(name)  then return true end
-    if IsInGroup() and UnitInParty(name) then return true end
+local function NormalizePlayerName(name)
+    if not name then return "" end
+    local short = name:match("^[^%-]+") or name
+    return string.lower(short)
+end
+
+InOurGroup = function(name)
+    local target = NormalizePlayerName(name)
+    if target == "" then return false end
+    if target == NormalizePlayerName(UnitName("player")) then return true end
+
+    if IsInRaid() then
+        for i = 1, 40 do
+            local member = UnitName("raid" .. i)
+            if member and NormalizePlayerName(member) == target then
+                return true
+            end
+        end
+    elseif IsInGroup() then
+        for i = 1, 4 do
+            local member = UnitName("party" .. i)
+            if member and NormalizePlayerName(member) == target then
+                return true
+            end
+        end
+    end
     return false
+end
+
+local function ForEachGroupMember(callback)
+    if not callback then return end
+    if IsInRaid() then
+        for i = 1, 40 do
+            local unit = "raid" .. i
+            local member = UnitName(unit)
+            if member and not UnitIsUnit(unit, "player") then
+                callback(member)
+            end
+        end
+    elseif IsInGroup() then
+        for i = 1, 4 do
+            local unit = "party" .. i
+            local member = UnitName(unit)
+            if member then
+                callback(member)
+            end
+        end
+    end
 end
 
 -- ================================================================
@@ -217,6 +376,7 @@ local function BroadcastHelloAndRequest()
 
     -- Hello goes to group + CUSTOM CHANNEL (Discovery)
     SendToGroupAndGuild(helloMsg, true)
+    ForEachGroupMember(function(member) WhisperPlayer(helloMsg, member) end)
 
     local now = GetTime()
     for name, info in pairs(ns.p2pPeers) do
@@ -232,6 +392,7 @@ local function BroadcastStateToAll(msg)
     if not ns.p2pEnabled or not msg then return end
     -- States ONLY go to Group/Guild. Peers outside group get whispers.
     local sentGroup = SendToGroupAndGuild(msg, false)
+    ForEachGroupMember(function(member) WhisperPlayer(msg, member) end)
     local now = GetTime()
     for name, info in pairs(ns.p2pPeers) do
         if info.lastSeen and (now - info.lastSeen) < PEER_TIMEOUT_SECS then
@@ -246,6 +407,7 @@ local function BroadcastClearToAll(msg)
     if not ns.p2pEnabled or not msg then return end
     -- Clear goes to group + CUSTOM CHANNEL
     local sentGroup = SendToGroupAndGuild(msg, true)
+    ForEachGroupMember(function(member) WhisperPlayer(msg, member) end)
     local now = GetTime()
     for name, info in pairs(ns.p2pPeers) do
         if info.lastSeen and (now - info.lastSeen) < PEER_TIMEOUT_SECS then
@@ -443,6 +605,11 @@ end
 --- Ask all known peers to re-send their state (direct whispers).
 function ns.P2PRequestStates()
     if not ns.p2pEnabled then return end
+    
+    -- Send request to group channel first
+    SendToGroupAndGuild(MSG_REQUEST, false)
+    ForEachGroupMember(function(member) WhisperPlayer(MSG_REQUEST, member) end)
+    
     local now = GetTime()
     for name, info in pairs(ns.p2pPeers) do
         if info.lastSeen and (now - info.lastSeen) < PEER_TIMEOUT_SECS then
@@ -457,19 +624,13 @@ end
 -- ================================================================
 
 function ns.P2PHandleAddonMessage(prefix, msg, channelName, senderName)
+    if not ns.p2pEnabled then return end
     if not msg then return end
 
     -- Raw Chat Fallback (Channel or standard Whisper)
     if not prefix then
-        local pTag = "<" .. PREFIX .. ">"
-        local isChat = false
-        if msg:sub(1, #pTag) == pTag then
-            msg = msg:sub(#pTag + 1)
-            isChat = true
-        elseif msg:sub(1, 8) == "TM_SYNC:" then
-            msg = msg:sub(9)
-            isChat = true
-        end
+        local isChat = IsSyncChatPayload(msg)
+        msg = NormalizeSyncChatMessage(msg)
 
         if isChat then
             if channelName == "WHISPER" or (channelName and string.find(string.lower(channelName), string.lower(SYNC_CHANNEL_NAME), 1, true)) then
@@ -491,8 +652,9 @@ function ns.P2PHandleAddonMessage(prefix, msg, channelName, senderName)
 
     if msg == "" then return end
 
-    local myName = UnitName("player")
-    if senderName == myName then return end
+    if not senderName or senderName == "" or UnitIsUnit(senderName, "player") then 
+        return 
+    end
 
     local msgType = msg:sub(1, 1)
 
@@ -663,13 +825,65 @@ end
 -- linger. Peers re-introduce themselves via Hello/Request after load.
 -- ================================================================
 function ns.P2PClearAllPeers()
-    ns.SendRawMorphCommand("PEER_CLEAR_ALL")
+    for _, info in pairs(ns.p2pPeers or {}) do
+        if info and info.guid then
+            SendPeerClearToDLL(info.guid)
+        end
+    end
+    if ns.IsMorpherReady() then
+        ns.SendRawMorphCommand("PEER_CLEAR_ALL")
+    end
     p2pStateCache     = {}
     lastBroadcastBody = nil   -- force next broadcast regardless of dedup
     -- Keep ns.p2pPeers table so we can re-whisper known peers after load
 end
 
-local discoverDebounce = {}
+function ns.P2PSetEnabled(enabled)
+    enabled = not not enabled
+    if enabled == ns.p2pEnabled then
+        if enabled then
+            if JoinChannelByName then
+                JoinChannelByName(SYNC_CHANNEL_NAME)
+            end
+            lastBroadcastBody = nil
+            ns.P2PBroadcastHello()
+            ns.P2PRequestStates()
+            ns.P2PBroadcastState()
+        end
+        return
+    end
+
+    if not enabled then
+        local myGuid = GetMyGUIDHex()
+        if myGuid then
+            local clearMsg = MSG_CLEAR .. "|" .. myGuid
+            BroadcastClearToAll(clearMsg)
+        end
+        ns.p2pEnabled = false
+        if LeaveChannelByName then
+            LeaveChannelByName(SYNC_CHANNEL_NAME)
+        end
+        syncChannelId = nil
+        ns.P2PClearAllPeers()
+        wipe(ns.p2pPeers)
+        wipe(recentWhispers)
+        wipe(discoverDebounce)
+        broadcastPending = false
+        broadcastDebounce:Hide()
+        broadcastDebounce.elapsed = 0
+        return
+    end
+
+    ns.p2pEnabled = true
+    syncChannelId = nil
+    if JoinChannelByName then
+        JoinChannelByName(SYNC_CHANNEL_NAME)
+    end
+    lastBroadcastBody = nil
+    ns.P2PBroadcastHello()
+    ns.P2PRequestStates()
+end
+
 function ns.P2PDiscoverPlayer(targetName)
     if not ns.p2pEnabled or not targetName then return end
     if targetName == UnitName("player") then return end
@@ -682,8 +896,7 @@ function ns.P2PDiscoverPlayer(targetName)
     
     local guid = GetMyGUIDHex()
     if guid then
-        -- Send standard AddonMessage Hello directly
-        pcall(SendAddonMessage, PREFIX, MSG_HELLO .. "|" .. guid, "WHISPER", targetName)
+        TrySendAddon(PREFIX, MSG_HELLO .. "|" .. guid, "WHISPER", targetName)
         P2PLog("Proximity Discovery triggered for: %s", targetName)
     end
 end

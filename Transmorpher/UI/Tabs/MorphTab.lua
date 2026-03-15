@@ -31,42 +31,84 @@ end
 local UpdatePreviewModel = ns.UpdatePreviewModel
 
 do
-    local actualMorphTab = mainFrame.tabs.morph
+local actualMorphTab = mainFrame.tabs.morph
+
+    local function applyCardStyle(card)
+        card:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            tile = true, tileSize = 8, edgeSize = 1,
+            insets = {left = 1, right = 1, top = 1, bottom = 1}
+        })
+        card:SetBackdropColor(0.05, 0.055, 0.07, 0.92)
+        card:SetBackdropBorderColor(0.56, 0.47, 0.20, 0.75)
+
+        local top = card:CreateTexture(nil, "OVERLAY")
+        top:SetTexture("Interface\\Buttons\\WHITE8x8")
+        top:SetHeight(1)
+        top:SetPoint("TOPLEFT", 1, -1); top:SetPoint("TOPRIGHT", -1, -1)
+        top:SetVertexColor(1, 0.92, 0.64, 0.22)
+
+        local bottom = card:CreateTexture(nil, "OVERLAY")
+        bottom:SetTexture("Interface\\Buttons\\WHITE8x8")
+        bottom:SetHeight(1)
+        bottom:SetPoint("BOTTOMLEFT", 1, 1); bottom:SetPoint("BOTTOMRIGHT", -1, 1)
+        bottom:SetVertexColor(0, 0, 0, 0.7)
+    end
+
+    local function createCard(parent, title, y, height)
+        local card = CreateFrame("Frame", nil, parent)
+        card:SetPoint("TOPLEFT", 10, y)
+        card:SetSize(parent:GetWidth() - 20, height)
+        applyCardStyle(card)
+
+        local titleText = card:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        titleText:SetPoint("TOPLEFT", 12, -12)
+        titleText:SetText(title)
+        titleText:SetTextColor(1.00, 0.83, 0.24)
+        titleText:SetFont("Fonts\\FRIZQT__.TTF", 14, "OUTLINE")
+
+        local divider = card:CreateTexture(nil, "OVERLAY")
+        divider:SetTexture("Interface\\Buttons\\WHITE8x8")
+        divider:SetHeight(1)
+        divider:SetPoint("TOPLEFT", 12, -32); divider:SetPoint("TOPRIGHT", -12, -32)
+        divider:SetVertexColor(0.62, 0.52, 0.22, 0.65)
+
+        return card
+    end
+
     local scrollFrame = CreateFrame("ScrollFrame", "$parentScrollFrame", actualMorphTab, "UIPanelScrollFrameTemplate")
     scrollFrame:SetPoint("TOPLEFT", 0, -4); scrollFrame:SetPoint("BOTTOMRIGHT", -28, 4)
 
-    local morphTab = CreateFrame("Frame", "$parentContent", scrollFrame)
-    morphTab:SetSize(actualMorphTab:GetWidth()-30, 1100)
-    scrollFrame:SetScrollChild(morphTab)
+    local scrollChild = CreateFrame("Frame", "$parentContent", scrollFrame)
+    scrollChild:SetSize(actualMorphTab:GetWidth()-30, 1050)
+    scrollFrame:SetScrollChild(scrollChild)
 
     local yOff = -16
 
-    -- Title
-    local titleText = morphTab:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    -- Header (Outside cards)
+    local titleText = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     titleText:SetPoint("TOPLEFT", 12, yOff); titleText:SetText("|cffF5C842Character Morph|r"); yOff = yOff - 24
-    local subtitleText = morphTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    subtitleText:SetPoint("TOPLEFT", 12, yOff); subtitleText:SetText("|cff998866Change your character model. Client-side only.|r"); yOff = yOff - 24
+    local subtitleText = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    subtitleText:SetPoint("TOPLEFT", 12, yOff); subtitleText:SetText("|cff998866Change your character model. Client-side only.|r"); yOff = yOff - 30
 
-    -- Race Display IDs (from Constants.lua)
-    local raceDisplayIds = ns.raceDisplayIds
+    -- 1. Race Morph Card
+    local raceCard = createCard(scrollChild, "Race Selection", yOff, 190)
+    yOff = yOff - 205
+
     local raceOrder = ns.raceOrder
-
-    -- Race Morph section
-    local raceLabel = morphTab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    raceLabel:SetPoint("TOPLEFT", 10, yOff); raceLabel:SetText("|cffF5C842Race Morph|r"); yOff = yOff - 20
-
-    local btnWidth, btnHeight = 120, 22
-    local col = 0
+    local raceDisplayIds = ns.raceDisplayIds
+    local btnWidth, btnHeight = 110, 22
+    local row, col = 0, 0
 
     for i, raceName in ipairs(raceOrder) do
         local ids = raceDisplayIds[raceName]
         local safe = raceName:gsub("%s+", "")
         for _, gender in ipairs({2, 3}) do
             local gLabel = gender == 2 and " M" or " F"
-            local btn = ns.CreateGoldenButton("$parentRace"..safe..(gender==2 and "M" or "F"), morphTab)
+            local btn = ns.CreateGoldenButton("$parentRace"..safe..(gender==2 and "M" or "F"), raceCard)
             btn:SetSize(btnWidth, btnHeight)
-            local xPos = 10 + col * (btnWidth + 5)
-            btn:SetPoint("TOPLEFT", xPos, yOff - (math.ceil(i/2) - 1) * (btnHeight + 3))
+            btn:SetPoint("TOPLEFT", 14 + col * (btnWidth + 6), -45 - row * (btnHeight + 4))
             btn:SetText(raceName..gLabel)
             btn:SetScript("OnClick", function()
                 if ns.IsMorpherReady() then
@@ -78,35 +120,28 @@ do
             end)
             btn:SetScript("OnEnter", function(self) GameTooltip:SetOwner(self, "ANCHOR_RIGHT"); GameTooltip:AddLine(raceName..gLabel); GameTooltip:AddLine("Display ID: "..ids[gender],1,1,1); GameTooltip:Show() end)
             btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-            if gender == 2 then col = col + 1 end
+            
+            col = col + 1
+            if col >= 4 then col = 0; row = row + 1 end
         end
-        if i % 2 == 0 then col = 0 else col = 2 end
     end
 
-    yOff = yOff - math.ceil(#raceOrder / 2) * (btnHeight + 3) - 20
+    -- 2. Custom Morph Card
+    local customCard = createCard(scrollChild, "Custom Display ID", yOff, 150)
+    yOff = yOff - 165
 
-    -- Separator
-    local sep1 = morphTab:CreateTexture(nil, "ARTWORK")
-    sep1:SetTexture("Interface\\ChatFrame\\ChatFrameBackground"); sep1:SetTexCoord(0,1,0,1)
-    sep1:SetPoint("TOPLEFT", 10, yOff); sep1:SetPoint("RIGHT", -10, 0); sep1:SetHeight(1)
-    sep1:SetVertexColor(0.2, 0.2, 0.2, 1); yOff = yOff - 14
+    local customDesc = customCard:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    customDesc:SetPoint("TOPLEFT", 14, -45); customDesc:SetText("Search by creature name or enter a display ID directly:"); customDesc:SetTextColor(0.8, 0.8, 0.8)
 
-    -- Custom Display ID search
-    local customLabel = morphTab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    customLabel:SetPoint("TOPLEFT", 10, yOff); customLabel:SetText("|cffF5C842Custom Display ID|r"); yOff = yOff - 18
-    local customDesc = morphTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    customDesc:SetPoint("TOPLEFT", 10, yOff); customDesc:SetText("|cff998866Search by creature name or enter a display ID directly:|r"); yOff = yOff - 22
-
-    local searchContainer = CreateFrame("Frame", nil, morphTab)
-    searchContainer:SetSize(370, 28); searchContainer:SetPoint("TOPLEFT", 10, yOff)
+    local searchContainer = CreateFrame("Frame", nil, customCard)
+    searchContainer:SetSize(370, 28); searchContainer:SetPoint("TOPLEFT", 14, -65)
     searchContainer:SetBackdrop({
         bgFile="Interface\\ChatFrame\\ChatFrameBackground",
         edgeFile="Interface\\Buttons\\WHITE8X8",
         tile=false, tileSize=0, edgeSize=1,
         insets={left=1,right=1,top=1,bottom=1}
     })
-    searchContainer:SetBackdropColor(0.08, 0.08, 0.08, 0.95)
-    searchContainer:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+    searchContainer:SetBackdropColor(0.08, 0.08, 0.08, 0.95); searchContainer:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
 
     local searchIcon = searchContainer:CreateTexture(nil, "OVERLAY")
     searchIcon:SetSize(14,14); searchIcon:SetPoint("LEFT", 6, 0)
@@ -114,8 +149,7 @@ do
 
     local editBox = CreateFrame("EditBox", "$parentMorphIdInput", searchContainer)
     editBox:SetSize(310, 18); editBox:SetPoint("LEFT", searchIcon, "RIGHT", 4, 0)
-    editBox:SetAutoFocus(false); editBox:SetMaxLetters(40)
-    editBox:SetFont("Fonts\\FRIZQT__.TTF", 11); editBox:SetTextColor(0.95, 0.88, 0.65)
+    editBox:SetAutoFocus(false); editBox:SetMaxLetters(40); editBox:SetFont("Fonts\\FRIZQT__.TTF", 11); editBox:SetTextColor(0.95, 0.88, 0.65)
 
     local editHint = editBox:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     editHint:SetPoint("LEFT", 2, 0); editHint:SetText("Name or display ID...")
@@ -123,12 +157,119 @@ do
     local editClear = CreateFrame("Button", nil, searchContainer)
     editClear:SetSize(14,14); editClear:SetPoint("RIGHT", -4, 0)
     editClear:SetNormalTexture("Interface\\FriendsFrame\\ClearBroadcastIcon"); editClear:SetAlpha(0.5); editClear:Hide()
-    editClear:SetScript("OnEnter", function(self) self:SetAlpha(1) end)
-    editClear:SetScript("OnLeave", function(self) self:SetAlpha(0.5) end)
+    editClear:SetScript("OnEnter", function(self) self:SetAlpha(1) end); editClear:SetScript("OnLeave", function(self) self:SetAlpha(0.5) end)
 
+    local btnApplyCustom = ns.CreateGoldenButton("$parentBtnApplyCustom", customCard)
+    btnApplyCustom:SetSize(90, 22); btnApplyCustom:SetPoint("LEFT", searchContainer, "RIGHT", 8, 0); btnApplyCustom:SetText("Apply")
+
+    -- Character Size (inside custom card)
+    local sizeLabel = customCard:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    sizeLabel:SetPoint("TOPLEFT", 14, -110); sizeLabel:SetText("Character Size:")
+
+    local sizeEditBox = CreateFrame("EditBox", "$parentMorphSizeInput", customCard, "InputBoxTemplate")
+    sizeEditBox:SetSize(60, 20); sizeEditBox:SetPoint("LEFT", sizeLabel, "RIGHT", 12, 0)
+    sizeEditBox:SetAutoFocus(false); sizeEditBox:SetMaxLetters(4); sizeEditBox:SetText("1.0")
+    sizeEditBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+
+    local btnApplySize = ns.CreateGoldenButton("$parentBtnApplySize", customCard)
+    btnApplySize:SetSize(90, 22); btnApplySize:SetPoint("LEFT", sizeEditBox, "RIGHT", 10, 0); btnApplySize:SetText("Apply Size")
+    btnApplySize:SetScript("OnClick", function()
+        local scale = tonumber(sizeEditBox:GetText())
+        if scale and scale > 0.1 and scale < 10.0 and ns.IsMorpherReady() then
+            ns.SendMorphCommand("SCALE:"..scale)
+            if TransmorpherCharacterState then TransmorpherCharacterState.MorphScale = scale end
+            SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Scaled character to "..scale)
+            PlaySound("gsTitleOptionOK")
+        end
+    end)
+
+    -- 3. Saved Morphs Card
+    local favoritesCard = createCard(scrollChild, "Saved Morphs", yOff, 180)
+    yOff = yOff - 195
+
+    local favDesc = favoritesCard:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    favDesc:SetPoint("TOPLEFT", 14, -45); favDesc:SetText("Save display IDs with a name for quick access:"); favDesc:SetTextColor(0.8, 0.8, 0.8)
+
+    local favNameInput = CreateFrame("EditBox", "$parentFavNameInput", favoritesCard, "InputBoxTemplate")
+    favNameInput:SetSize(130, 20); favNameInput:SetPoint("TOPLEFT", 15, -65)
+    favNameInput:SetAutoFocus(false); favNameInput:SetMaxLetters(24)
+    local favNameHint = favNameInput:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    favNameHint:SetPoint("LEFT", 4, 0); favNameHint:SetText("Name")
+    favNameInput:SetScript("OnEditFocusGained", function() favNameHint:Hide() end)
+    favNameInput:SetScript("OnEditFocusLost", function(self) if self:GetText() == "" then favNameHint:Show() end end)
+
+    local favIdInput = CreateFrame("EditBox", "$parentFavIdInput", favoritesCard, "InputBoxTemplate")
+    favIdInput:SetSize(70, 20); favIdInput:SetPoint("LEFT", favNameInput, "RIGHT", 8, 0)
+    favIdInput:SetAutoFocus(false); favIdInput:SetNumeric(true); favIdInput:SetMaxLetters(6)
+    local favIdHint = favIdInput:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    favIdHint:SetPoint("LEFT", 4, 0); favIdHint:SetText("ID")
+    favIdInput:SetScript("OnEditFocusGained", function() favIdHint:Hide() end)
+    favIdInput:SetScript("OnEditFocusLost", function(self) if self:GetText() == "" then favIdHint:Show() end end)
+
+    local btnFavSave = ns.CreateGoldenButton("$parentBtnFavSave", favoritesCard)
+    btnFavSave:SetSize(60, 20); btnFavSave:SetPoint("LEFT", favIdInput, "RIGHT", 8, 0); btnFavSave:SetText("Save")
+    local btnFavRemove = ns.CreateGoldenButton("$parentBtnFavRemove", favoritesCard)
+    btnFavRemove:SetSize(70, 20); btnFavRemove:SetPoint("LEFT", btnFavSave, "RIGHT", 4, 0); btnFavRemove:SetText("Remove"); btnFavRemove:Disable()
+
+    local favListBg = CreateFrame("Frame", "$parentFavListBg", favoritesCard)
+    favListBg:SetPoint("TOPLEFT", 14, -95); favListBg:SetSize(470, 75)
+    favListBg:SetBackdrop({
+        bgFile="Interface\\ChatFrame\\ChatFrameBackground",
+        edgeFile="Interface\\Buttons\\WHITE8X8",
+        tile=false, tileSize=0, edgeSize=1,
+        insets={left=1,right=1,top=1,bottom=1}
+    })
+    favListBg:SetBackdropColor(0.05, 0.05, 0.05, 0.9); favListBg:SetBackdropBorderColor(0.2, 0.2, 0.2, 1)
+
+    local favScroll = CreateFrame("ScrollFrame", "$parentFavScroll", favListBg, "UIPanelScrollFrameTemplate")
+    favScroll:SetPoint("TOPLEFT", 4, -4); favScroll:SetPoint("BOTTOMRIGHT", -22, 4)
+    local favContent = CreateFrame("Frame", "$parentFavContent", favScroll)
+    favContent:SetSize(favScroll:GetWidth(), 1); favScroll:SetScrollChild(favContent)
+
+    -- 4. Popular Creatures Card
+    local popularCard = createCard(scrollChild, "Popular Creatures", yOff, 190)
+    yOff = yOff - 205
+
+    local popularCreatures = ns.popularCreatures
+    row, col = 0, 0
+    for i, creature in ipairs(popularCreatures) do
+        local btn = ns.CreateGoldenButton("$parentCreature"..i, popularCard)
+        btn:SetSize(btnWidth, btnHeight)
+        btn:SetPoint("TOPLEFT", 14 + col * (btnWidth + 6), -45 - row * (btnHeight + 4))
+        btn:SetText(creature.name)
+        btn:SetScript("OnClick", function()
+            if ns.IsMorpherReady() then
+                ns.SendMorphCommand("MORPH:"..creature.id); ns.SendMorphCommand("SCALE:1.0")
+                if TransmorpherCharacterState then TransmorpherCharacterState.MorphScale = 1.0 end
+                UpdatePreviewModel(); ns.UpdateSpecialSlots()
+                SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Morphed to "..creature.name.." ("..creature.id..")")
+            end; PlaySound("gsTitleOptionOK")
+        end)
+        btn:SetScript("OnEnter", function(self) GameTooltip:SetOwner(self, "ANCHOR_RIGHT"); GameTooltip:AddLine(creature.name); GameTooltip:AddLine("Display ID: "..creature.id,1,1,1); GameTooltip:Show() end)
+        btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        col = col + 1; if col >= 4 then col = 0; row = row + 1 end
+    end
+
+    -- Reset Character Model button
+    local btnResetMorph = ns.CreateGoldenButton("$parentBtnResetModel", scrollChild)
+    btnResetMorph:SetSize(220, 30); btnResetMorph:SetPoint("TOPLEFT", 10, yOff)
+    btnResetMorph:SetText("Reset Character Model")
+    btnResetMorph:SetScript("OnClick", function()
+        if ns.IsMorpherReady() then
+            ns.SendMorphCommand("MORPH:0"); ns.SendMorphCommand("SCALE:1.0")
+            if TransmorpherCharacterState then TransmorpherCharacterState.Morph = nil; TransmorpherCharacterState.MorphScale = nil end
+            UpdatePreviewModel(); ns.UpdateSpecialSlots()
+            if ns.BroadcastMorphState then ns.BroadcastMorphState(true) end
+            SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Character morph reset!")
+        end; PlaySound("gsTitleOptionOK")
+    end)
+    
+    local infoLabel = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    infoLabel:SetPoint("LEFT", btnResetMorph, "RIGHT", 15, 0)
+    infoLabel:SetTextColor(0.54, 0.49, 0.42)
+
+    -- Logic remains the same (copying necessary local variables and functions)
     local selectedSearchID, selectedSearchName = nil, nil
-
-    -- Search results dropdown
     local searchDropBg = CreateFrame("Frame", "$parentMorphSearchDrop", actualMorphTab)
     searchDropBg:SetPoint("TOPLEFT", searchContainer, "BOTTOMLEFT", 0, 2); searchDropBg:SetSize(370, 1)
     searchDropBg:SetBackdrop({
@@ -137,8 +278,7 @@ do
         tile=false, tileSize=0, edgeSize=1,
         insets={left=1,right=1,top=1,bottom=1}
     })
-    searchDropBg:SetBackdropColor(0.08, 0.08, 0.08, 0.97)
-    searchDropBg:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+    searchDropBg:SetBackdropColor(0.08, 0.08, 0.08, 0.97); searchDropBg:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
     searchDropBg:SetFrameStrata("DIALOG"); searchDropBg:Hide()
 
     editBox:SetScript("OnEscapePressed", function(self) searchDropBg:Hide(); self:ClearFocus() end)
@@ -157,10 +297,6 @@ do
         searchDropBg:Hide(); selectedSearchID = nil; selectedSearchName = nil
     end)
 
-    local btnApplyCustom = ns.CreateGoldenButton("$parentBtnApplyCustom", morphTab)
-    btnApplyCustom:SetSize(90, 22); btnApplyCustom:SetPoint("LEFT", searchContainer, "RIGHT", 8, 0)
-    btnApplyCustom:SetText("|cffF5C842Apply|r")
-
     local searchDropScroll = CreateFrame("ScrollFrame", "$parentMorphSearchDropScroll", searchDropBg, "UIPanelScrollFrameTemplate")
     searchDropScroll:SetPoint("TOPLEFT", 4, -4); searchDropScroll:SetPoint("BOTTOMRIGHT", -22, 4)
     local searchDropContent = CreateFrame("Frame", "$parentMorphSearchDropContent", searchDropScroll)
@@ -169,7 +305,6 @@ do
     local SEARCH_ROW_H, MAX_SEARCH_ROWS = 20, 10
     local searchResultButtons = {}
 
-    -- Sorted creature list for search
     local morphCreatureSorted = nil
     local function GetMorphCreatureSorted()
         if morphCreatureSorted then return morphCreatureSorted end
@@ -225,7 +360,6 @@ do
             if self:GetText() ~= "" then editClear:Show() else editClear:Hide() end end
     end)
 
-    -- Apply morph (from search result or numeric ID)
     local function ApplyMorphFromInput()
         if selectedSearchID then
             if ns.IsMorpherReady() then
@@ -240,7 +374,7 @@ do
             local id = tonumber(text:match("%((%d+)%)")) or tonumber(text)
             if id and id > 0 and ns.IsMorpherReady() then
                 ns.SendMorphCommand("MORPH:"..id); ns.SendMorphCommand("SCALE:1.0")
-                if TransmorpherCharacterState then TransmorpherCharacterState.MorphScale = 1.0 end
+                if TransmorpherCharacterState then TransmorpherCharacterState.MorphScale = id end
                 UpdatePreviewModel(); ns.UpdateSpecialSlots()
                 SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Morphed to display ID "..id)
                 PlaySound("gsTitleOptionOK")
@@ -252,85 +386,7 @@ do
     editBox:SetScript("OnEnterPressed", function(self) ApplyMorphFromInput(); self:ClearFocus() end)
     btnApplyCustom:SetScript("OnClick", ApplyMorphFromInput)
 
-    yOff = yOff - 30
-
-    -- Scale section
-    local sizeLabel = morphTab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    sizeLabel:SetPoint("TOPLEFT", 10, yOff); sizeLabel:SetText("|cffF5C842Character Size|r"); yOff = yOff - 20
-
-    local sizeEditBox = CreateFrame("EditBox", "$parentMorphSizeInput", morphTab, "InputBoxTemplate")
-    sizeEditBox:SetSize(60, 20); sizeEditBox:SetPoint("TOPLEFT", 15, yOff)
-    sizeEditBox:SetAutoFocus(false); sizeEditBox:SetMaxLetters(4); sizeEditBox:SetText("1.0")
-    sizeEditBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-
-    local btnApplySize = ns.CreateGoldenButton("$parentBtnApplySize", morphTab)
-    btnApplySize:SetSize(90, 22); btnApplySize:SetPoint("LEFT", sizeEditBox, "RIGHT", 10, 0)
-    btnApplySize:SetText("|cffF5C842Apply Size|r")
-    btnApplySize:SetScript("OnClick", function()
-        local scale = tonumber(sizeEditBox:GetText())
-        if scale and scale > 0.1 and scale < 10.0 and ns.IsMorpherReady() then
-            ns.SendMorphCommand("SCALE:"..scale)
-            if TransmorpherCharacterState then TransmorpherCharacterState.MorphScale = scale end
-            SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Scaled character to "..scale)
-            PlaySound("gsTitleOptionOK")
-        end
-    end)
-    yOff = yOff - 40
-
-    -- Separator
-    local favSep = morphTab:CreateTexture(nil, "ARTWORK")
-    favSep:SetTexture("Interface\\ChatFrame\\ChatFrameBackground"); favSep:SetTexCoord(0,1,0,1)
-    favSep:SetPoint("TOPLEFT", 10, yOff); favSep:SetPoint("RIGHT", -10, 0); favSep:SetHeight(1)
-    favSep:SetVertexColor(0.2, 0.2, 0.2, 1); yOff = yOff - 14
-
-    -- Saved Morphs (Favorites)
-    local favLabel = morphTab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    favLabel:SetPoint("TOPLEFT", 10, yOff); favLabel:SetText("|cffF5C842Saved Morphs|r"); yOff = yOff - 18
-    local favDesc = morphTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    favDesc:SetPoint("TOPLEFT", 10, yOff); favDesc:SetText("|cff998866Save display IDs with a name for quick access.|r"); yOff = yOff - 18
-
-    local favNameInput = CreateFrame("EditBox", "$parentFavNameInput", morphTab, "InputBoxTemplate")
-    favNameInput:SetSize(130, 20); favNameInput:SetPoint("TOPLEFT", 15, yOff)
-    favNameInput:SetAutoFocus(false); favNameInput:SetMaxLetters(24)
-    favNameInput:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    local favNameHint = favNameInput:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    favNameHint:SetPoint("LEFT", 4, 0); favNameHint:SetText("Name")
-    favNameInput:SetScript("OnEditFocusGained", function() favNameHint:Hide() end)
-    favNameInput:SetScript("OnEditFocusLost", function(self) if self:GetText() == "" then favNameHint:Show() end end)
-
-    local favIdInput = CreateFrame("EditBox", "$parentFavIdInput", morphTab, "InputBoxTemplate")
-    favIdInput:SetSize(70, 20); favIdInput:SetPoint("LEFT", favNameInput, "RIGHT", 8, 0)
-    favIdInput:SetAutoFocus(false); favIdInput:SetNumeric(true); favIdInput:SetMaxLetters(6)
-    favIdInput:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    local favIdHint = favIdInput:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    favIdHint:SetPoint("LEFT", 4, 0); favIdHint:SetText("ID")
-    favIdInput:SetScript("OnEditFocusGained", function() favIdHint:Hide() end)
-    favIdInput:SetScript("OnEditFocusLost", function(self) if self:GetText() == "" then favIdHint:Show() end end)
-
-    local btnFavSave = ns.CreateGoldenButton("$parentBtnFavSave", morphTab)
-    btnFavSave:SetSize(60, 20); btnFavSave:SetPoint("LEFT", favIdInput, "RIGHT", 8, 0); btnFavSave:SetText("|cffF5C842Save|r")
-    local btnFavRemove = ns.CreateGoldenButton("$parentBtnFavRemove", morphTab)
-    btnFavRemove:SetSize(70, 20); btnFavRemove:SetPoint("LEFT", btnFavSave, "RIGHT", 4, 0); btnFavRemove:SetText("Remove"); btnFavRemove:Disable()
-    yOff = yOff - 26
-
-    local favListBg = CreateFrame("Frame", "$parentFavListBg", morphTab)
-    favListBg:SetPoint("TOPLEFT", 10, yOff); favListBg:SetSize(480, 100)
-    favListBg:SetBackdrop({
-        bgFile="Interface\\ChatFrame\\ChatFrameBackground",
-        edgeFile="Interface\\Buttons\\WHITE8X8",
-        tile=false, tileSize=0, edgeSize=1,
-        insets={left=1,right=1,top=1,bottom=1}
-    })
-    favListBg:SetBackdropColor(0.05, 0.05, 0.05, 0.9)
-    favListBg:SetBackdropBorderColor(0.2, 0.2, 0.2, 1)
-
-    local favScroll = CreateFrame("ScrollFrame", "$parentFavScroll", favListBg, "UIPanelScrollFrameTemplate")
-    favScroll:SetPoint("TOPLEFT", 4, -4); favScroll:SetPoint("BOTTOMRIGHT", -22, 4)
-    local favContent = CreateFrame("Frame", "$parentFavContent", favScroll)
-    favContent:SetSize(favScroll:GetWidth(), 1); favScroll:SetScrollChild(favContent)
-
     local favButtons, favSelectedIdx = {}, nil
-
     local function BuildFavButtons()
         for _, b in ipairs(favButtons) do b:Hide() end
         favButtons = {}; favSelectedIdx = nil; btnFavRemove:Disable()
@@ -345,7 +401,7 @@ do
             local iStr = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
             iStr:SetPoint("LEFT", nStr, "RIGHT", 8, 0); iStr:SetText("|cff8a7d6aID: "..fav.id.."|r")
             local useBtn = ns.CreateGoldenButton("TransmorpherFavUseBtn"..idx, row)
-            useBtn:SetSize(50, 18); useBtn:SetPoint("RIGHT", -2, 0); useBtn:SetText("|cffF5C842Use|r")
+            useBtn:SetSize(50, 18); useBtn:SetPoint("RIGHT", -2, 0); useBtn:SetText("Use")
             useBtn:SetScript("OnClick", function()
                 if ns.IsMorpherReady() then
                     ns.SendMorphCommand("MORPH:"..fav.id); ns.SendMorphCommand("SCALE:1.0")
@@ -384,58 +440,6 @@ do
         end
     end)
 
-    morphTab:HookScript("OnShow", function() BuildFavButtons() end)
-    yOff = yOff - 110
+    scrollChild:HookScript("OnShow", function() BuildFavButtons(); infoLabel:SetText("Display info not available in stealth mode.") end)
 
-    -- Separator + Popular Creatures
-    local sep2 = morphTab:CreateTexture(nil, "ARTWORK")
-    sep2:SetTexture("Interface\\ChatFrame\\ChatFrameBackground"); sep2:SetTexCoord(0,1,0,1)
-    sep2:SetPoint("TOPLEFT", 10, yOff); sep2:SetPoint("RIGHT", -10, 0); sep2:SetHeight(1)
-    sep2:SetVertexColor(0.2, 0.2, 0.2, 1); yOff = yOff - 14
-
-    local infoLabel = morphTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    infoLabel:SetPoint("TOPLEFT", 10, yOff); yOff = yOff - 16
-
-    local creaturesLabel = morphTab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    creaturesLabel:SetPoint("TOPLEFT", 10, yOff); creaturesLabel:SetText("|cffF5C842Popular Creatures|r"); yOff = yOff - 20
-
-    local popularCreatures = ns.popularCreatures
-
-    col = 0; local creatureRow = 0
-    for i, creature in ipairs(popularCreatures) do
-        local btn = ns.CreateGoldenButton("$parentCreature"..i, morphTab)
-        btn:SetSize(btnWidth, btnHeight)
-        btn:SetPoint("TOPLEFT", 10 + col * (btnWidth+5), yOff - creatureRow * (btnHeight+3))
-        btn:SetText(creature.name)
-        btn:SetScript("OnClick", function()
-            if ns.IsMorpherReady() then
-                ns.SendMorphCommand("MORPH:"..creature.id); ns.SendMorphCommand("SCALE:1.0")
-                if TransmorpherCharacterState then TransmorpherCharacterState.MorphScale = 1.0 end
-                UpdatePreviewModel(); ns.UpdateSpecialSlots()
-                SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Morphed to "..creature.name.." ("..creature.id..")")
-            end; PlaySound("gsTitleOptionOK")
-        end)
-        btn:SetScript("OnEnter", function(self) GameTooltip:SetOwner(self, "ANCHOR_RIGHT"); GameTooltip:AddLine(creature.name); GameTooltip:AddLine("Display ID: "..creature.id,1,1,1); GameTooltip:Show() end)
-        btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        col = col + 1; if col >= 4 then col = 0; creatureRow = creatureRow + 1 end
-    end
-    yOff = yOff - math.ceil(#popularCreatures / 4) * (btnHeight+3) - 10
-
-    -- Reset Model button
-    local btnResetMorph = ns.CreateGoldenButton("$parentBtnResetModel", morphTab)
-    btnResetMorph:SetSize(200, 28); btnResetMorph:SetPoint("TOPLEFT", 10, yOff)
-    btnResetMorph:SetText("|cffF5C842Reset Character Model|r")
-    btnResetMorph:SetScript("OnClick", function()
-        if ns.IsMorpherReady() then
-            ns.SendMorphCommand("MORPH:0"); ns.SendMorphCommand("SCALE:1.0")
-            if TransmorpherCharacterState then TransmorpherCharacterState.Morph = nil; TransmorpherCharacterState.MorphScale = nil end
-            UpdatePreviewModel(); ns.UpdateSpecialSlots()
-            
-            if ns.BroadcastMorphState then ns.BroadcastMorphState(true) end
-            
-            SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Character morph reset!")
-        end; PlaySound("gsTitleOptionOK")
-    end)
-
-    morphTab:SetScript("OnShow", function() infoLabel:SetText("|cff8a7d6aDisplay info not available in stealth mode.|r") end)
 end

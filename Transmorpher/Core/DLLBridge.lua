@@ -8,7 +8,7 @@ local addon, ns = ...
 
 -- Global variables the DLL interacts with
 TRANSMORPHER_CMD = ""             -- DLL reads this for commands
-TRANSMORPHER_DLL_LOADED = nil     -- DLL sets to "TRUE" when loaded
+TRANSMORPHER_DLL_LOADED = "TRUE"    -- Force LOADED status (User override)
 
 -- ============================================================
 -- COMMAND TRACKING
@@ -156,54 +156,30 @@ local function TrackMorphCommand(cmd)
 
         elseif prefix == "RESET" and parts[2] then
             if parts[2] == "ALL" then
-                if TransmorpherCharacterState and TransmorpherCharacterState.Items then
-                    for slotId, _ in pairs(TransmorpherCharacterState.Items) do
-                        local slotName = ns.equipSlotIdToSlot[slotId]
-                        if slotName then
-                            local nativeId = ns.GetEquippedItemForSlot(slotName) or 0
-                            ns.TrackUnmorphedSlot(slotId, nativeId)
-                        end
-                    end
+                -- Hard clear character state
+                if TransmorpherCharacterState then
+                    if TransmorpherCharacterState.Items then wipe(TransmorpherCharacterState.Items) end
+                    if TransmorpherCharacterState.HiddenItems then wipe(TransmorpherCharacterState.HiddenItems) end
+                    if TransmorpherCharacterState.Mounts then wipe(TransmorpherCharacterState.Mounts) end
+                    if TransmorpherCharacterState.WeaponSets then wipe(TransmorpherCharacterState.WeaponSets) end
+                    TransmorpherCharacterState.Morph = nil
+                    TransmorpherCharacterState.Scale = nil
+                    TransmorpherCharacterState.MountDisplay = nil
+                    TransmorpherCharacterState.PetDisplay = nil
+                    TransmorpherCharacterState.MountHidden = false
+                    TransmorpherCharacterState.GroundMountDisplay = nil
+                    TransmorpherCharacterState.GroundMountName = nil
+                    TransmorpherCharacterState.FlyingMountDisplay = nil
+                    TransmorpherCharacterState.FlyingMountName = nil
+                    TransmorpherCharacterState.HunterPetDisplay = nil
+                    TransmorpherCharacterState.HunterPetScale = nil
+                    TransmorpherCharacterState.EnchantMH = nil
+                    TransmorpherCharacterState.EnchantOH = nil
+                    TransmorpherCharacterState.TitleID = nil
                 end
+                
                 ns.networkResetPending = true
-                -- Clear state in-place to preserve references
-                if TransmorpherCharacterState.Items then
-                    wipe(TransmorpherCharacterState.Items)
-                else
-                    TransmorpherCharacterState.Items = {}
-                end
-                TransmorpherCharacterState.Morph = nil
-                TransmorpherCharacterState.Scale = nil
-                TransmorpherCharacterState.MountDisplay = nil
-                TransmorpherCharacterState.PetDisplay = nil
-                TransmorpherCharacterState.MountHidden = false
-                if TransmorpherCharacterState.HiddenItems then
-                    wipe(TransmorpherCharacterState.HiddenItems)
-                else
-                    TransmorpherCharacterState.HiddenItems = {}
-                end
-                TransmorpherCharacterState.GroundMountDisplay = nil
-                TransmorpherCharacterState.GroundMountName = nil
-                TransmorpherCharacterState.FlyingMountDisplay = nil
-                TransmorpherCharacterState.FlyingMountName = nil
-                -- Clear per-mount morphs too
-                if TransmorpherCharacterState.Mounts then
-                    wipe(TransmorpherCharacterState.Mounts)
-                else
-                    TransmorpherCharacterState.Mounts = {}
-                end
-                TransmorpherCharacterState.HunterPetDisplay = nil
-                TransmorpherCharacterState.HunterPetScale = nil
-                TransmorpherCharacterState.EnchantMH = nil
-                TransmorpherCharacterState.EnchantOH = nil
-                TransmorpherCharacterState.TitleID = nil
-                if TransmorpherCharacterState.WeaponSets then
-                    wipe(TransmorpherCharacterState.WeaponSets)
-                else
-                    TransmorpherCharacterState.WeaponSets = {}
-                end
-                -- Preserve Forms
-                if not TransmorpherCharacterState.Forms then TransmorpherCharacterState.Forms = {} end
+                ns.needsCharacterReset = true -- Force RESET:ALL on next full sync too
             else
                 local slotId = tonumber(parts[2])
                 if slotId then
@@ -278,15 +254,7 @@ end
 -- ============================================================
 
 function ns.IsMorpherReady()
-    if TRANSMORPHER_DLL_LOADED then
-        return true
-    else
-        if not _G.TransmorpherDLLWarned then
-            SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: |cffff0000ERROR:|r Morpher DLL not loaded! Place dinput8.dll (or version.dll/dsound.dll) in your WoW folder.")
-            _G.TransmorpherDLLWarned = true
-        end
-        return false
-    end
+    return true -- DLL checking removed (User override)
 end
 
 -- ============================================================
@@ -320,6 +288,11 @@ function ns.SendFullMorphState()
     if ns.needsCharacterReset then
         table.insert(cmdQueue, "RESET:ALL")
         ns.needsCharacterReset = false
+    end
+
+    -- Ensure we resume from the manual SUSPEND sent during loading screens
+    if not (ns.morphSuspended or ns.dbwSuspended or ns.vehicleSuspended) then
+        table.insert(cmdQueue, "RESUME")
     end
 
     local activeMorph = ns.currentFormMorph or TransmorpherCharacterState.Morph
