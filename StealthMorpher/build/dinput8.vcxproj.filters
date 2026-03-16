@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\KIRA\Desktop\SAFE\safe\StealthMorpher\src\dllmain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\KIRA\Desktop\SAFE\safe\StealthMorpher\src\Utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\KIRA\Desktop\SAFE\safe\StealthMorpher\src\Proxy.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\KIRA\Desktop\SAFE\safe\StealthMorpher\src\Hooks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\KIRA\Desktop\SAFE\safe\StealthMorpher\src\Morpher.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\KIRA\Desktop\SAFE\safe\StealthMorpher\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="C:\Users\KIRA\Desktop\SAFE\safe\StealthMorpher\src\dinput8_exports.def">
+      <Filter>Source Files</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{A0056F30-11C7-3E5F-A952-D0D131554C25}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,10 @@
+^C:\USERS\KIRA\DESKTOP\SAFE\SAFE\STEALTHMORPHER\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/KIRA/Desktop/SAFE/safe/StealthMorpher -BC:/Users/KIRA/Desktop/SAFE/safe/StealthMorpher/build --check-stamp-file C:/Users/KIRA/Desktop/SAFE/safe/StealthMorpher/build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
