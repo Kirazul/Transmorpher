@@ -131,6 +131,7 @@ Current release: **1.1.9**
 ### 1.1.9
 - Version bump and internal improvements
 - Improved state persistence reliability
+- **NEW:** Improved logging system. The log is now automatically saved to `Logs/Transmorpher.log` and clears itself on each game launch to prevent file size bloat.
 
 ### 1.1.8
 - **NEW:** Implemented 255-byte message limit bypass for full gear sync (dual Thunderfury + full sets now work)
