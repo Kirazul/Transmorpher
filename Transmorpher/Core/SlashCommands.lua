@@ -77,10 +77,6 @@ SlashCmdList["Transmorpher"] = function(msg)
             ns.SendMorphCommand("RESET:ALL")
             -- Clear mount morphs
             if TransmorpherCharacterState then
-                TransmorpherCharacterState.GroundMountDisplay = nil
-                TransmorpherCharacterState.GroundMountName = nil
-                TransmorpherCharacterState.FlyingMountDisplay = nil
-                TransmorpherCharacterState.FlyingMountName = nil
                 TransmorpherCharacterState.MountDisplay = nil
                 TransmorpherCharacterState.MountHidden = false
                 if TransmorpherCharacterState.Mounts then

@@ -513,6 +513,34 @@ function ns.RestoreMorphedUI()
             end
         end
 
+        -- Helper: apply hidden-slot visual state to a slot
+        local function RestoreHiddenSlot(slot, equipSlotId, slotName)
+            local iconItemId = nil
+            local trackedItem = TransmorpherCharacterState.Items and TransmorpherCharacterState.Items[equipSlotId]
+            if trackedItem and trackedItem > 0 then
+                iconItemId = trackedItem
+            elseif slot.itemId and slot.itemId > 0 then
+                iconItemId = slot.itemId
+            else
+                iconItemId = ns.GetEquippedItemForSlot(slotName)
+            end
+            if iconItemId and iconItemId > 0 then
+                slot:SetItem(iconItemId)
+            end
+            if slot.textures and slot.textures.item and slot.textures.empty and slot.itemId and slot.itemId > 0 then
+                slot.textures.empty:Hide()
+                slot.textures.item:Show()
+            end
+            slot.isHiddenSlot = true
+            slot.isMorphed = true
+            slot.morphedItemId = iconItemId and iconItemId > 0 and iconItemId or nil
+            ns.ShowMorphGlow(slot)
+            if slot.eyeButton then
+                slot.eyeButton.isHidden = true
+                if slot.eyeButton.UpdateVisuals then slot.eyeButton:UpdateVisuals() end
+            end
+        end
+
         -- Step 2: overlay morphed items with glow
         if TransmorpherCharacterState.Items then
             for equipSlotId, itemId in pairs(TransmorpherCharacterState.Items) do
@@ -522,30 +550,7 @@ function ns.RestoreMorphedUI()
                     local slot = mainFrame.slots[slotName]
                     local isHidden = itemId == -1 or (TransmorpherCharacterState.HiddenItems and TransmorpherCharacterState.HiddenItems[equipSlotId])
                     if isHidden then
-                        local iconItemId = nil
-                        local trackedItem = TransmorpherCharacterState.Items and TransmorpherCharacterState.Items[equipSlotId]
-                        if trackedItem and trackedItem > 0 then
-                            iconItemId = trackedItem
-                        elseif slot.itemId and slot.itemId > 0 then
-                            iconItemId = slot.itemId
-                        else
-                            iconItemId = ns.GetEquippedItemForSlot(slotName)
-                        end
-                        if iconItemId and iconItemId > 0 then
-                            slot:SetItem(iconItemId)
-                        end
-                        if slot.textures and slot.textures.item and slot.textures.empty and slot.itemId and slot.itemId > 0 then
-                            slot.textures.empty:Hide()
-                            slot.textures.item:Show()
-                        end
-                        slot.isHiddenSlot = true
-                        slot.isMorphed = true
-                        slot.morphedItemId = iconItemId and iconItemId > 0 and iconItemId or nil
-                        ns.ShowMorphGlow(slot)
-                        if slot.eyeButton then
-                            slot.eyeButton.isHidden = true
-                            if slot.eyeButton.UpdateVisuals then slot.eyeButton:UpdateVisuals() end
-                        end
+                        RestoreHiddenSlot(slot, equipSlotId, slotName)
                     elseif not (equippedId and equippedId == itemId) then
                         slot:SetItem(itemId)
                         slot.isHiddenSlot = false
@@ -572,30 +577,7 @@ function ns.RestoreMorphedUI()
                     local slotName = ns.equipSlotIdToSlot[equipSlotId]
                     local slot = slotName and mainFrame.slots[slotName]
                     if slot then
-                        local iconItemId = nil
-                        local trackedItem = TransmorpherCharacterState.Items and TransmorpherCharacterState.Items[equipSlotId]
-                        if trackedItem and trackedItem > 0 then
-                            iconItemId = trackedItem
-                        elseif slot.itemId and slot.itemId > 0 then
-                            iconItemId = slot.itemId
-                        else
-                            iconItemId = ns.GetEquippedItemForSlot(slotName)
-                        end
-                        if iconItemId and iconItemId > 0 then
-                            slot:SetItem(iconItemId)
-                        end
-                        if slot.textures and slot.textures.item and slot.textures.empty and slot.itemId and slot.itemId > 0 then
-                            slot.textures.empty:Hide()
-                            slot.textures.item:Show()
-                        end
-                        slot.isHiddenSlot = true
-                        slot.isMorphed = true
-                        slot.morphedItemId = iconItemId and iconItemId > 0 and iconItemId or nil
-                        ns.ShowMorphGlow(slot)
-                        if slot.eyeButton then
-                            slot.eyeButton.isHidden = true
-                            if slot.eyeButton.UpdateVisuals then slot.eyeButton:UpdateVisuals() end
-                        end
+                        RestoreHiddenSlot(slot, equipSlotId, slotName)
                     end
                 end
             end

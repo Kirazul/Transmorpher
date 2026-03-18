@@ -1,7 +1,6 @@
 #pragma once
 #include <cstdint>
 #include <windows.h>
-#include <cstdint>
 
 // Forward declarations for types we don't fully define
 struct WowObject;

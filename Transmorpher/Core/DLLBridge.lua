@@ -97,10 +97,6 @@ local function TrackMorphCommand(cmd)
             end
         elseif prefix == "MOUNT_RESET" then
             TransmorpherCharacterState.MountDisplay = nil
-            TransmorpherCharacterState.GroundMountDisplay = nil
-            TransmorpherCharacterState.GroundMountName = nil
-            TransmorpherCharacterState.FlyingMountDisplay = nil
-            TransmorpherCharacterState.FlyingMountName = nil
             TransmorpherCharacterState.MountHidden = false
             
             local activeMountSpellID = ns.GetActiveMountSpellID and ns.GetActiveMountSpellID()
@@ -182,10 +178,7 @@ local function TrackMorphCommand(cmd)
                 else
                     TransmorpherCharacterState.HiddenItems = {}
                 end
-                TransmorpherCharacterState.GroundMountDisplay = nil
-                TransmorpherCharacterState.GroundMountName = nil
-                TransmorpherCharacterState.FlyingMountDisplay = nil
-                TransmorpherCharacterState.FlyingMountName = nil
+
                 -- Clear per-mount morphs too
                 if TransmorpherCharacterState.Mounts then
                     wipe(TransmorpherCharacterState.Mounts)

@@ -34,6 +34,19 @@ local lastDBWActive = false
 local lastKnownMounted = false
 
 -- ============================================================
+-- TIMING & BURST CONSTANTS
+-- ============================================================
+local MOUNT_BURST_SHOTS_MOUNTING  = 8     -- burst commands when first mounting
+local MOUNT_BURST_SHOTS_REMOUNT   = 4     -- burst commands when re-applying (already mounted)
+local MOUNT_BURST_INTERVAL        = 0.05  -- seconds between mount burst commands
+local FORM_BURST_SHOTS            = 3     -- burst commands when a form morph is applied
+local FORM_BURST_INTERVAL         = 0.04  -- seconds between form burst commands
+local FORM_RECHECK_DURATION       = 0.7   -- seconds to run form recheck polling
+local FORM_RECHECK_INTERVAL       = 0.06  -- seconds between form recheck polls
+local FORM_REENFORCE_COOLDOWN     = 0.35  -- seconds before periodic form morph re-enforcement
+local VEHICLE_GUARD_INTERVAL      = 0.1   -- seconds between vehicle safety guard polls
+
+-- ============================================================
 -- Smart Interaction Intervention — pre-emptive vehicle detection
 -- ============================================================
 local function HandleSmartIntervention(unit)
@@ -117,7 +130,7 @@ mountBurstFrame:Hide()
 mountBurstFrame.elapsed = 0
 mountBurstFrame:SetScript("OnUpdate", function(self, dt)
     self.elapsed = self.elapsed + dt
-    if self.elapsed < 0.05 then return end
+    if self.elapsed < MOUNT_BURST_INTERVAL then return end
     self.elapsed = 0
     if ns.vehicleSuspended then self:Hide(); return end
     if mountBurstShots > 0 then
@@ -136,11 +149,11 @@ function ns.ApplyMountMorph(isMounting, forcedSpellID)
     mountBurstID = targetID
     if isMounting then
         ns.SendRawMorphCommand("SET:MOUNTED:1")
-        mountBurstShots = 8
+        mountBurstShots = MOUNT_BURST_SHOTS_MOUNTING
         mountBurstFrame:Show()
     else
         -- When re-applying (already mounted), use a shorter burst to ensure it survives model changes
-        mountBurstShots = 4
+        mountBurstShots = MOUNT_BURST_SHOTS_REMOUNT
         mountBurstFrame:Show()
     end
 end
@@ -187,7 +200,7 @@ local formBurstFrame = CreateFrame("Frame")
 formBurstFrame:Hide()
 formBurstFrame.displayID = nil
 formBurstFrame.elapsed = 0
-formBurstFrame.interval = 0.04
+formBurstFrame.interval = FORM_BURST_INTERVAL
 formBurstFrame.shotsLeft = 0
 formBurstFrame:SetScript("OnUpdate", function(self, dt)
     if not self.displayID or self.shotsLeft <= 0 then
@@ -235,8 +248,8 @@ local function StartFormBurst(displayID)
     if not displayID then return end
     formBurstFrame.displayID = displayID
     formBurstFrame.elapsed = 0
-    formBurstFrame.interval = 0.04
-    formBurstFrame.shotsLeft = 3
+    formBurstFrame.interval = FORM_BURST_INTERVAL
+    formBurstFrame.shotsLeft = FORM_BURST_SHOTS
     formBurstFrame:Show()
 end
 
@@ -375,7 +388,7 @@ function ns.CheckFormMorphs()
         elseif not ns.formMorphRuntimeActive then
             ApplyTemporaryFormMorph(newMorph)
             StartFormBurst(newMorph)
-        elseif (GetTime() - lastFormMorphApplyAt) > 0.35 then
+        elseif (GetTime() - lastFormMorphApplyAt) > FORM_REENFORCE_COOLDOWN then
             -- Periodic re-enforcement to prevent leaking
             ns.SendRawMorphCommand("MORPH:" .. newMorph)
             lastFormMorphApplyAt = GetTime()
@@ -441,13 +454,6 @@ mainFrame:SetScript("OnEvent", function(self, event, ...)
             TransmorpherCharacterState.MountHidden = false
         end
         if not TransmorpherCharacterState.WeaponSets then TransmorpherCharacterState.WeaponSets = {} end
-        -- Ensure ground/flying mount fields exist
-        if TransmorpherCharacterState.GroundMountDisplay and TransmorpherCharacterState.GroundMountDisplay <= 0 then
-            TransmorpherCharacterState.GroundMountDisplay = nil
-        end
-        if TransmorpherCharacterState.FlyingMountDisplay and TransmorpherCharacterState.FlyingMountDisplay <= 0 then
-            TransmorpherCharacterState.FlyingMountDisplay = nil
-        end
         if TransmorpherCharacterState.MountDisplay and TransmorpherCharacterState.MountDisplay <= 0 then
             TransmorpherCharacterState.MountDisplay = nil
         end
@@ -721,7 +727,11 @@ end
 -- ============================================================
 do
     local guard = CreateFrame("Frame")
-    guard:SetScript("OnUpdate", function()
+    guard.elapsed = 0
+    guard:SetScript("OnUpdate", function(self, dt)
+        self.elapsed = self.elapsed + dt
+        if self.elapsed < VEHICLE_GUARD_INTERVAL then return end
+        self.elapsed = 0
         if not TRANSMORPHER_DLL_LOADED then return end
         local inVehicle = UnitInVehicle("player")
         if not inVehicle and UnitExists("target") then

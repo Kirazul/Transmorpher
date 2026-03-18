@@ -142,12 +142,6 @@ stats:SetScript("OnEnter", function(self)
         local s = TransmorpherCharacterState
         -- 1. Mount (Universal)
         local mountEntry = s.MountName or (s.MountDisplay and s.MountDisplay > 0 and ("ID " .. s.MountDisplay))
-        if not mountEntry and (s.GroundMountDisplay or s.FlyingMountDisplay) then
-             -- Fallback for legacy data
-             mountEntry = s.MountName or s.GroundMountName or s.FlyingMountName or 
-                          (s.GroundMountDisplay and s.GroundMountDisplay > 0 and ("ID " .. s.GroundMountDisplay)) or
-                          (s.FlyingMountDisplay and s.FlyingMountDisplay > 0 and ("ID " .. s.FlyingMountDisplay))
-        end
         if s.MountHidden then mountEntry = "|cff888888Hidden|r" end
 
         if mountEntry then

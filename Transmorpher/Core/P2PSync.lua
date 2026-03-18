@@ -111,8 +111,8 @@ end
 local function P2PLogChannels()
     local list = {GetChannelList()}
     local channels = {}
-    -- list is [id1, name1, id2, name2, ...] step by 2
-    for i=1, #list, 2 do
+    -- WoW 3.3.5a: GetChannelList returns triples (id, name, disabled)
+    for i=1, #list, 3 do
         local id, name = list[i], list[i+1]
         if type(id) == "number" and type(name) == "string" then
             table.insert(channels, string.format("[%d. %s]", id, name))

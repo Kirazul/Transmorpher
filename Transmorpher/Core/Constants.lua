@@ -5,7 +5,7 @@ local addon, ns = ...
 -- Centralized color palette, dimensions, slot data, race data
 -- ============================================================
 
-ns.VERSION = "1.1.8"
+ns.VERSION = "1.1.9"
 ns.ADDON_PREFIX = "Transmorpher"
 
 -- ============================================================
