@@ -104,7 +104,22 @@ inline uint32_t GetVisibleEnchantField(int slot) {
 
 // Global Pointers
 static const DWORD P_CLIENT_CONNECTION = 0x00C79CE0; // 3.3.5a 12340
-static const DWORD P_OBJECT_MGR_OFFSET = 0x2E04;     // Relative to ClientConnection? No, usually static.
-// Re-verified 3.3.5a offsets:
-// ObjectMgr is at [0x00C79CE0] + 0x2ED0 in some versions, or static.
-// We use the scanning method in Utils.cpp usually.
+static const DWORD P_OBJECT_MGR_OFFSET = 0x2ED0;     // Corrected offset
+
+// Character Selection (Glue) Offsets
+static const DWORD P_GAME_STATE = 0x00B6A9E0;         // 0 = Glue, 1 = World
+static const DWORD P_CHARACTER_COUNT = 0x00B6B23C;
+static const DWORD P_CHARACTER_INFO = 0x00B6B240;      // Pointer to array
+static const DWORD P_CHARACTER_SELECTION = 0x00AC436C; // Selected index (0-based)
+
+// Character Selection Entry Structure (Approximate)
+struct CharacterSelectEntry {
+    uint64_t guid;       // 0x00
+    char name[21];       // 0x08
+    uint8_t race;        // 0x1D
+    uint8_t classId;     // 0x1E
+    uint8_t gender;      // 0x1F
+    // ... many more fields, total size 0x120
+};
+
+static const size_t CHARACTER_SELECT_ENTRY_SIZE = 0x120;

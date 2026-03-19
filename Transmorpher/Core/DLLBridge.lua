@@ -317,6 +317,37 @@ function ns.InitializeDLLSettings()
     
     local settings = ns.GetSettings()
     
+    if not TransmorpherCharacterState then 
+        TransmorpherCharacterState = {} 
+    end
+
+    -- STATE RECOVERY: If SavedVariables were wiped, pull from DLL
+    local hasItems = next(TransmorpherCharacterState.Items or {}) ~= nil
+    local hasMorphData = TransmorpherCharacterState.Morph or hasItems
+    
+    if TRANSMORPHER_DLL_STATE and not hasMorphData then
+        TransmorpherCharacterState.Morph = TRANSMORPHER_DLL_STATE.morph
+        TransmorpherCharacterState.Scale = TRANSMORPHER_DLL_STATE.scale
+        TransmorpherCharacterState.MountDisplay = TRANSMORPHER_DLL_STATE.mount
+        TransmorpherCharacterState.EnchantMH = TRANSMORPHER_DLL_STATE.emh
+        TransmorpherCharacterState.EnchantOH = TRANSMORPHER_DLL_STATE.eoh
+        TransmorpherCharacterState.TitleID = TRANSMORPHER_DLL_STATE.title
+        TransmorpherCharacterState.Items = TransmorpherCharacterState.Items or {}
+        TransmorpherCharacterState.HiddenItems = TransmorpherCharacterState.HiddenItems or {}
+        
+        for s, id in pairs(TRANSMORPHER_DLL_STATE.items) do
+            if id == 0 then
+                TransmorpherCharacterState.HiddenItems[s] = true
+            else
+                TransmorpherCharacterState.Items[s] = id
+            end
+        end
+        
+        if ns.RestoreMorphedUI then
+            ns.RestoreMorphedUI()
+        end
+    end
+
     -- Send all settings to DLL immediately
     ns.SendRawMorphCommand("SET:DBW:" .. (settings.showDBWProc and "1" or "0"))
     ns.SendRawMorphCommand("SET:META:" .. (settings.showMetamorphosis and "1" or "0"))
@@ -324,6 +355,12 @@ function ns.InitializeDLLSettings()
     
     dllSettingsInitialized = true
     dllInitRetryFrame:Hide()
+    
+    -- Sync all saved state to the DLL immediately upon initialization
+    if ns.SendFullMorphState then
+        ns.SendFullMorphState()
+    end
+
     if type(Log) == "function" then
         Log("DLL settings initialized: DBW=%s, META=%s, SHAPE=%s",
             settings.showDBWProc and "1" or "0",

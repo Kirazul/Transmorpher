@@ -271,6 +271,32 @@ mainFrame:SetScript("OnEvent", function(self, event, ...)
         if not TransmorpherCharacterState then
             TransmorpherCharacterState = {Items={}, Morph=nil, Scale=nil, MountDisplay=nil, PetDisplay=nil, Mounts={}, HunterPetDisplay=nil, HunterPetScale=nil, EnchantMH=nil, EnchantOH=nil, TitleID=nil, Forms={}, WeaponSets={}}
         end
+        
+        -- RECOVER FROM DLL (Fixes "mount doesnt show on first login" when WTF is wiped)
+        if TRANSMORPHER_DLL_STATE then
+            ns.Log("DLL state found in global memory, restoring to Lua...")
+            if TRANSMORPHER_DLL_STATE.morph and TRANSMORPHER_DLL_STATE.morph > 0 then
+                TransmorpherCharacterState.Morph = TransmorpherCharacterState.Morph or TRANSMORPHER_DLL_STATE.morph
+            end
+            if TRANSMORPHER_DLL_STATE.scale and TRANSMORPHER_DLL_STATE.scale > 0.01 then
+                TransmorpherCharacterState.Scale = TransmorpherCharacterState.Scale or TRANSMORPHER_DLL_STATE.scale
+            end
+            if TRANSMORPHER_DLL_STATE.mount and TRANSMORPHER_DLL_STATE.mount > 0 then
+                TransmorpherCharacterState.MountDisplay = TransmorpherCharacterState.MountDisplay or TRANSMORPHER_DLL_STATE.mount
+            end
+            if TRANSMORPHER_DLL_STATE.title and TRANSMORPHER_DLL_STATE.title > 0 then
+                TransmorpherCharacterState.TitleID = TransmorpherCharacterState.TitleID or TRANSMORPHER_DLL_STATE.title
+            end
+            if TRANSMORPHER_DLL_STATE.items then
+                for slot, item in pairs(TRANSMORPHER_DLL_STATE.items) do
+                    if item > 0 then
+                        TransmorpherCharacterState.Items[slot] = TransmorpherCharacterState.Items[slot] or item
+                    end
+                end
+            end
+            -- Clear it so we don't restore it again on every reload
+            TRANSMORPHER_DLL_STATE = nil
+        end
         if not TransmorpherCharacterState.Items then TransmorpherCharacterState.Items = {} end
         if not TransmorpherCharacterState.Forms then TransmorpherCharacterState.Forms = {} end
         if not TransmorpherCharacterState.Mounts then TransmorpherCharacterState.Mounts = {} end
@@ -338,11 +364,11 @@ mainFrame:SetScript("OnEvent", function(self, event, ...)
             end
         end
 
-        if IsMounted() then
-             ns.SendRawMorphCommand("SET:MOUNTED:1")
-             ns.MountManager.ApplyCorrectMorph(true)
-        end
-        ScheduleMorphSend(0.4)
+              ns.MountManager.ApplyCorrectMorph(true)
+        
+        -- Sync is now handled immediately by ns.InitializeDLLSettings
+        -- if DLL is already loaded, or when it loads.
+
         ns.RestoreMorphedUI()
 
         -- Multiplayer Sync

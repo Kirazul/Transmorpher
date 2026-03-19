@@ -1,0 +1,12 @@
+Version MSBuild 17.14.40+3e7442088 pour .NET Framework
+
+  Hooks.cpp
+  dllmain.cpp
+C:\Users\KIRA\Desktop\stable\StealthMorpher\src\Hooks.cpp(210,1): warning C4102: 'is_dbw'┬á: ├®tiquette non r├®f├®renc├®e [C:\Users\KIRA\Desktop\stable\StealthMorpher\build\dinput8.vcxproj]
+C:\Users\KIRA\Desktop\stable\StealthMorpher\src\Hooks.cpp(218,29): error C2094: ├®tiquette 'g_originalDisplay' non d├®finie [C:\Users\KIRA\Desktop\stable\StealthMorpher\build\dinput8.vcxproj]
+C:\Users\KIRA\Desktop\stable\StealthMorpher\src\Hooks.cpp(242,5): warning C4102: 'set_item_val'┬á: ├®tiquette non r├®f├®renc├®e [C:\Users\KIRA\Desktop\stable\StealthMorpher\build\dinput8.vcxproj]
+C:\Users\KIRA\Desktop\stable\StealthMorpher\src\Hooks.cpp(244,5): warning C4102: 'pop_eax_and_original'┬á: ├®tiquette non r├®f├®renc├®e [C:\Users\KIRA\Desktop\stable\StealthMorpher\build\dinput8.vcxproj]
+C:\Users\KIRA\Desktop\stable\StealthMorpher\src\Hooks.cpp(249,5): warning C4102: 'check_mh'┬á: ├®tiquette non r├®f├®renc├®e [C:\Users\KIRA\Desktop\stable\StealthMorpher\build\dinput8.vcxproj]
+C:\Users\KIRA\Desktop\stable\StealthMorpher\src\Hooks.cpp(251,5): warning C4102: 'check_oh'┬á: ├®tiquette non r├®f├®renc├®e [C:\Users\KIRA\Desktop\stable\StealthMorpher\build\dinput8.vcxproj]
+C:\Users\KIRA\Desktop\stable\StealthMorpher\src\Hooks.cpp(253,5): warning C4102: 'check_title'┬á: ├®tiquette non r├®f├®renc├®e [C:\Users\KIRA\Desktop\stable\StealthMorpher\build\dinput8.vcxproj]
+  G├®n├®ration de code en cours...

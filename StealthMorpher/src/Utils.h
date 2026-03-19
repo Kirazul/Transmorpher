@@ -70,7 +70,8 @@ DWORD FindUpdateDisplayInfoHook(DWORD base);
 
 void ScanOffsets();
 bool IsInWorld();
-
+bool IsInGlue();
+uint64_t GetSelectedCharacterGuid();
 // DBC Reader for creature display info
 struct CreatureDisplayEntry {
     uint32_t displayID;

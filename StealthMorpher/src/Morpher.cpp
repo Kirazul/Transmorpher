@@ -214,6 +214,23 @@ void LoadFullState(uint64_t guid) {
                 UpdateHasMorph();
                 Log("Loaded state from %s (display=%u mount=%u)", 
                     path, g_morphDisplay, g_morphMount);
+
+                // PUSH STATE TO LUA FOR RECOVERY (in case SavedVariables/WTF was wiped)
+                if (FrameScript_Execute) {
+                    char stateBuf[1024];
+                    int pos = sprintf_s(stateBuf, sizeof(stateBuf), 
+                        "TRANSMORPHER_DLL_STATE = { morph=%u, scale=%.2f, mount=%u, emh=%u, eoh=%u, title=%u, items={} }; ",
+                        g_morphDisplay, g_morphScale, g_morphMount, g_morphEnchantMH, g_morphEnchantOH, g_morphTitle);
+                    
+                    for (int s = 1; s <= 19; s++) {
+                        if (g_morphItems[s] > 0) {
+                            uint32_t itId = (g_morphItems[s] == HIDDEN_SENTINEL) ? 0 : g_morphItems[s];
+                            pos += sprintf_s(stateBuf + pos, sizeof(stateBuf) - pos, 
+                                "TRANSMORPHER_DLL_STATE.items[%d] = %u; ", s, itId);
+                        }
+                    }
+                    FrameScript_Execute(stateBuf, "Transmorpher", 0);
+                }
             }
         }
         fclose(f);
@@ -455,12 +472,25 @@ void SoftResetState(WowObject* player) {
 
     UpdateHasMorph(); // Recalculate from current morph targets
 
-    // ROBUST LOGIN: If morph active, trigger ONE visual refresh to ensure it applies.
-    // This fixes the "Race morph not applying on login" issue if the hook missed the first build.
-    if (g_hasMorph && player && CGUnit_UpdateDisplayInfo && !g_initialRefreshDone) {
-        g_initialRefreshDone = true;
-        __try { CGUnit_UpdateDisplayInfo(player, 0); } __except(1) {}
-        Log("Initial safety refresh triggered for login morph");
+    // ROBUST LOGIN: Ensure all morph targets are written to descriptors BEFORE the refresh
+    if (g_hasMorph && player && !g_initialRefreshDone) {
+        // 1. Enforce character/item/scale state
+        ApplyMorphState(player);
+        
+        // 2. Enforce mount state manually (ApplyMorphState doesn't handle mount)
+        if (g_morphMount > 0 && player->descriptors) {
+            uint8_t* desc = (uint8_t*)player->descriptors;
+            uint32_t targetMount = (g_morphMount == HIDDEN_SENTINEL) ? 0 : g_morphMount;
+            *(uint32_t*)(desc + UNIT_FIELD_MOUNTDISPLAYID) = targetMount;
+            g_lastAppliedMount = targetMount;
+        }
+
+        // 3. Trigger the ONE safety visual refresh
+        if (CGUnit_UpdateDisplayInfo) {
+            g_initialRefreshDone = true;
+            __try { CGUnit_UpdateDisplayInfo(player, 1); } __except(1) {}
+            Log("Initial safety refresh (Hard Force) triggered. MorphId=%u MountId=%u", g_morphDisplay, g_morphMount);
+        }
     }
 
     Log("Soft reset complete");
@@ -698,7 +728,7 @@ bool DoMorph(const char* cmd, WowObject* player) {
                 Log("Morph suspended - state updated (displayId=%u) but not applied", id);
             }
             
-            update = false; // Already called update internally if needed
+            update = true; // Signal that change occurred
         } else if (id == 0) {
              g_morphDisplay = 0;
              if (!g_suspended) {
@@ -1341,12 +1371,12 @@ void GetNearbyPlayers(uint64_t playerGuid, char* outBuffer, size_t maxLen) {
     if (maxLen > 0) outBuffer[0] = '\0';
     
     __try {
-        uint32_t clientConnection = *(uint32_t*)P_CLIENT_CONNECTION;
+        uintptr_t clientConnection = *(uintptr_t*)P_CLIENT_CONNECTION;
         if (!clientConnection) return;
-        uint32_t objMgr = *(uint32_t*)(clientConnection + 0x2ED0);
+        uintptr_t objMgr = *(uintptr_t*)(clientConnection + 0x2ED0);
         if (!objMgr) return;
         
-        uint32_t objPtr = *(uint32_t*)(objMgr + 0xAC);
+        uintptr_t objPtr = *(uintptr_t*)(objMgr + 0xAC);
         int iterCount = 0;
         while (objPtr != 0 && (objPtr % 2 == 0) && ++iterCount <= 5000) {
             WowObject* current = (WowObject*)objPtr;
@@ -1363,7 +1393,7 @@ void GetNearbyPlayers(uint64_t playerGuid, char* outBuffer, size_t maxLen) {
                     if (guid != playerGuid) {
                         if (current->vtable) {
                             typedef const char* (__thiscall* GetObjectName_fn)(WowObject*);
-                            GetObjectName_fn fn = *(GetObjectName_fn*)(current->vtable + 54 * 4);
+                            GetObjectName_fn fn = *(GetObjectName_fn*)(uintptr_t(current->vtable) + 54 * 4);
                             if (fn) {
                                 const char* name = nullptr;
                                 __try { name = fn(current); } __except(1) {}
@@ -1381,7 +1411,7 @@ void GetNearbyPlayers(uint64_t playerGuid, char* outBuffer, size_t maxLen) {
                     }
                 }
             }
-            objPtr = *(uint32_t*)(objPtr + 0x3C); // nextObject is at offset 0x3C
+            objPtr = *(uintptr_t*)(objPtr + 0x3C); // nextObject is at offset 0x3C
         }
     } __except(1) {}
 }
