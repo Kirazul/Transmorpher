@@ -3,9 +3,13 @@
 #include "Utils.h"
 #include "Hooks.h"
 #include "Logger.h"
+#include "SpellMorph.h"
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
+#include <string>
+#include <vector>
+#include <unordered_map>
 
 // ================================================================
 // State Variables
@@ -80,7 +84,8 @@ void UpdateHasMorph() {
 // full client restarts without needing /reload or Lua restoration.
 // ================================================================
 static const uint32_t STATE_FILE_MAGIC = 0x544D5246; // 'TMRF'
-static const uint32_t STATE_FILE_VERSION = 2;
+static const uint32_t STATE_FILE_VERSION = 3;
+static const uint32_t MAX_PERSISTED_SPELL_MORPHS = 128;
 
 static char g_dllDir[MAX_PATH] = {0};
 static bool g_initialRefreshDone = false;
@@ -139,6 +144,19 @@ static void PurgeLegacyGlobalStateFiles() {
 }
 
 #pragma pack(push, 1)
+struct PersistentMorphStateV2 {
+    uint32_t magic;
+    uint32_t version;
+    uint32_t morphDisplay;
+    float morphScale;
+    uint32_t morphMount;
+    uint32_t morphEnchantMH;
+    uint32_t morphEnchantOH;
+    uint32_t morphTitle;
+    uint32_t morphItems[20];
+    uint32_t reserved[8];
+};
+
 struct PersistentMorphState {
     uint32_t magic;
     uint32_t version;
@@ -149,7 +167,9 @@ struct PersistentMorphState {
     uint32_t morphEnchantOH;
     uint32_t morphTitle;
     uint32_t morphItems[20];
-    uint32_t reserved[8]; // future expansion
+    uint32_t spellMorphCount;
+    SpellMorphPair spellMorphs[MAX_PERSISTED_SPELL_MORPHS];
+    uint32_t reserved[4];
 };
 #pragma pack(pop)
 
@@ -164,6 +184,7 @@ static void SaveToPath(const char* path) {
     state.morphEnchantOH = g_morphEnchantOH;
     state.morphTitle = g_morphTitle;
     memcpy(state.morphItems, g_morphItems, sizeof(g_morphItems));
+    state.spellMorphCount = (uint32_t)ExportSpellMorphPairs(state.spellMorphs, MAX_PERSISTED_SPELL_MORPHS);
     
     FILE* f = nullptr;
     if (fopen_s(&f, path, "wb") == 0 && f) {
@@ -195,6 +216,7 @@ void LoadFullState(uint64_t guid) {
     g_morphTitle = 0;
     memset(g_morphItems, 0, sizeof(g_morphItems));
     g_morphMount = 0;
+    ClearSpellMorphs();
 
     char path[MAX_PATH];
     GetStateFilePath(guid, path, sizeof(path));
@@ -202,8 +224,10 @@ void LoadFullState(uint64_t guid) {
     FILE* f = nullptr;
     if (fopen_s(&f, path, "rb") == 0 && f) {
         PersistentMorphState state = {};
-        if (fread(&state, sizeof(PersistentMorphState), 1, f) == 1) {
-            if (state.magic == STATE_FILE_MAGIC && state.version == STATE_FILE_VERSION) {
+        bool loaded = false;
+        if (fread(&state, sizeof(PersistentMorphState), 1, f) == 1 &&
+            state.magic == STATE_FILE_MAGIC &&
+            state.version == STATE_FILE_VERSION) {
                 g_morphDisplay = state.morphDisplay;
                 g_morphScale = state.morphScale;
                 g_morphMount = state.morphMount;
@@ -211,15 +235,18 @@ void LoadFullState(uint64_t guid) {
                 g_morphEnchantOH = state.morphEnchantOH;
                 g_morphTitle = state.morphTitle;
                 memcpy(g_morphItems, state.morphItems, sizeof(g_morphItems));
+                size_t pairCount = (size_t)state.spellMorphCount;
+                if (pairCount > MAX_PERSISTED_SPELL_MORPHS) pairCount = MAX_PERSISTED_SPELL_MORPHS;
+                ImportSpellMorphPairs(state.spellMorphs, pairCount);
                 UpdateHasMorph();
                 Log("Loaded state from %s (display=%u mount=%u)", 
                     path, g_morphDisplay, g_morphMount);
 
                 // PUSH STATE TO LUA FOR RECOVERY (in case SavedVariables/WTF was wiped)
                 if (FrameScript_Execute) {
-                    char stateBuf[1024];
+                    char stateBuf[8192];
                     int pos = sprintf_s(stateBuf, sizeof(stateBuf), 
-                        "TRANSMORPHER_DLL_STATE = { morph=%u, scale=%.2f, mount=%u, emh=%u, eoh=%u, title=%u, items={} }; ",
+                        "TRANSMORPHER_DLL_STATE = { morph=%u, scale=%.2f, mount=%u, emh=%u, eoh=%u, title=%u, items={}, spells={} }; ",
                         g_morphDisplay, g_morphScale, g_morphMount, g_morphEnchantMH, g_morphEnchantOH, g_morphTitle);
                     
                     for (int s = 1; s <= 19; s++) {
@@ -229,8 +256,30 @@ void LoadFullState(uint64_t guid) {
                                 "TRANSMORPHER_DLL_STATE.items[%d] = %u; ", s, itId);
                         }
                     }
+                    for (size_t i = 0; i < pairCount && pos > 0 && pos < (int)sizeof(stateBuf) - 64; ++i) {
+                        pos += sprintf_s(stateBuf + pos, sizeof(stateBuf) - pos,
+                            "TRANSMORPHER_DLL_STATE.spells[%u] = %u; ",
+                            state.spellMorphs[i].sourceSpellId, state.spellMorphs[i].targetSpellId);
+                    }
                     FrameScript_Execute(stateBuf, "Transmorpher", 0);
                 }
+                loaded = true;
+        }
+        if (!loaded) {
+            fseek(f, 0, SEEK_SET);
+            PersistentMorphStateV2 stateV2 = {};
+            if (fread(&stateV2, sizeof(PersistentMorphStateV2), 1, f) == 1 &&
+                stateV2.magic == STATE_FILE_MAGIC && stateV2.version == 2) {
+                g_morphDisplay = stateV2.morphDisplay;
+                g_morphScale = stateV2.morphScale;
+                g_morphMount = stateV2.morphMount;
+                g_morphEnchantMH = stateV2.morphEnchantMH;
+                g_morphEnchantOH = stateV2.morphEnchantOH;
+                g_morphTitle = stateV2.morphTitle;
+                memcpy(g_morphItems, stateV2.morphItems, sizeof(g_morphItems));
+                ClearSpellMorphs();
+                SaveFullState(guid);
+                UpdateHasMorph();
             }
         }
         fclose(f);
@@ -239,8 +288,9 @@ void LoadFullState(uint64_t guid) {
         GetLegacyStateFilePath(guid, legacyPath, sizeof(legacyPath));
         if (fopen_s(&f, legacyPath, "rb") == 0 && f) {
             PersistentMorphState state = {};
-            if (fread(&state, sizeof(PersistentMorphState), 1, f) == 1) {
-                if (state.magic == STATE_FILE_MAGIC && state.version == STATE_FILE_VERSION) {
+            bool loaded = false;
+            if (fread(&state, sizeof(PersistentMorphState), 1, f) == 1 &&
+                state.magic == STATE_FILE_MAGIC && state.version == STATE_FILE_VERSION) {
                     g_morphDisplay = state.morphDisplay;
                     g_morphScale = state.morphScale;
                     g_morphMount = state.morphMount;
@@ -248,10 +298,31 @@ void LoadFullState(uint64_t guid) {
                     g_morphEnchantOH = state.morphEnchantOH;
                     g_morphTitle = state.morphTitle;
                     memcpy(g_morphItems, state.morphItems, sizeof(g_morphItems));
+                    size_t pairCount = (size_t)state.spellMorphCount;
+                    if (pairCount > MAX_PERSISTED_SPELL_MORPHS) pairCount = MAX_PERSISTED_SPELL_MORPHS;
+                    ImportSpellMorphPairs(state.spellMorphs, pairCount);
                     SaveFullState(guid);
                     DeleteFileA(legacyPath);
                     UpdateHasMorph();
                     Log("Migrated legacy state to %s", path);
+                    loaded = true;
+            }
+            if (!loaded) {
+                fseek(f, 0, SEEK_SET);
+                PersistentMorphStateV2 stateV2 = {};
+                if (fread(&stateV2, sizeof(PersistentMorphStateV2), 1, f) == 1 &&
+                    stateV2.magic == STATE_FILE_MAGIC && stateV2.version == 2) {
+                    g_morphDisplay = stateV2.morphDisplay;
+                    g_morphScale = stateV2.morphScale;
+                    g_morphMount = stateV2.morphMount;
+                    g_morphEnchantMH = stateV2.morphEnchantMH;
+                    g_morphEnchantOH = stateV2.morphEnchantOH;
+                    g_morphTitle = stateV2.morphTitle;
+                    memcpy(g_morphItems, stateV2.morphItems, sizeof(g_morphItems));
+                    ClearSpellMorphs();
+                    SaveFullState(guid);
+                    DeleteFileA(legacyPath);
+                    UpdateHasMorph();
                 }
             }
             fclose(f);
@@ -520,6 +591,7 @@ void ResetAllMorphs(bool forceClearOnly) {
         g_initialRefreshDone = false; // PER-CHARACTER REFRESH: Allow new character to trigger a visual refresh
         g_lastLoadedGuid = 0;        // Reset tracking so we can reload the same character if needed
         g_remoteMorphs.clear();
+        ClearSpellMorphs();
         return;
     }
 
@@ -572,6 +644,7 @@ void ResetAllMorphs(bool forceClearOnly) {
     g_hasMorph = false;
     g_suspended = false;
     g_saved = false;
+    ClearSpellMorphs();
     
     // Update visual
     if (CGUnit_UpdateDisplayInfo) {
@@ -971,6 +1044,44 @@ bool DoMorph(const char* cmd, WowObject* player) {
             }
         }
     }
+    else if (strncmp(cmd, "SPELL_MORPH:", 12) == 0) {
+        uint32_t sourceSpellId = 0;
+        uint32_t targetSpellId = 0;
+        if (sscanf_s(cmd + 12, "%u:%u", &sourceSpellId, &targetSpellId) == 2) {
+            if (!SetSpellMorph(sourceSpellId, targetSpellId)) {
+                Log("Spell morph rejected (%u -> %u)", sourceSpellId, targetSpellId);
+            }
+        }
+    }
+    else if (strncmp(cmd, "SPELL_RESET:", 12) == 0) {
+        uint32_t sourceSpellId = (uint32_t)atoi(cmd + 12);
+        if (sourceSpellId > 0) {
+            RemoveSpellMorph(sourceSpellId);
+        }
+    }
+    else if (strncmp(cmd, "SPELL_SEARCH:", 13) == 0) {
+        auto HandleSearch = [](const char* c) {
+            if (FrameScript_Execute) {
+                std::string q = c + 13;
+                std::string res = SearchSpells(q);
+                char lCmd[8192];
+                sprintf_s(lCmd, sizeof(lCmd), "TRANSMORPHER_SEARCH_RESULTS = '%s'", res.c_str());
+                FrameScript_Execute(lCmd, "Transmorpher", 0);
+            }
+        };
+        HandleSearch(cmd);
+    }
+    else if (strcmp(cmd, "SPELL_DBC_STATUS") == 0) {
+        if (FrameScript_Execute) {
+            extern size_t GetSpellDBCRecordCount();
+            char lCmd[256];
+            sprintf_s(lCmd, sizeof(lCmd), "DEFAULT_CHAT_FRAME:AddMessage('|cff00ccff[Transmorpher]|r DLL DBC Status: %zu records loaded')", GetSpellDBCRecordCount());
+            FrameScript_Execute(lCmd, "Transmorpher", 0);
+        }
+    }
+    else if (strncmp(cmd, "SPELL_RESET_ALL", 15) == 0) {
+        ClearSpellMorphs();
+    }
     else if (strncmp(cmd, "RESET:", 6) == 0 && cmd[6] >= '0' && cmd[6] <= '9') {
         int slot = 0;
         if (sscanf_s(cmd + 6, "%d", &slot) == 1 && slot >= 1 && slot <= 19) {
@@ -1008,6 +1119,7 @@ bool DoMorph(const char* cmd, WowObject* player) {
         g_hasMorph = false;
         g_suspended = false;
         g_forceCharacterStateReload = true;
+        ClearSpellMorphs();
         // Do NOT call ResetAllMorphs or UpdateDisplayInfo
     }
     else if (strncmp(cmd, "SUSPEND", 7) == 0) {

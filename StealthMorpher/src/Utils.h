@@ -9,6 +9,7 @@ void* GetLuaState();
 uint64_t GetPlayerGuid();
 WowObject* GetPlayer();
 WowObject* GetObjectPtr(uint64_t guid, uint32_t typemask, const char* file, uint32_t line);
+void* GetRow(void* db, uint32_t id);
 
 // Lua functions
 typedef int  (__cdecl* FrameScript_Execute_fn)(const char*, const char*, int);

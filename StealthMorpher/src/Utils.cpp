@@ -39,6 +39,14 @@ WowObject* GetObjectPtr(uint64_t guid, uint32_t typemask, const char* file, uint
     return _GetObjectPtr(guid, typemask, file, line);
 }
 
+typedef void* (__thiscall* GetRow_fn)(void* db, uint32_t id);
+static auto _GetRow = (GetRow_fn)0x0065C290;
+
+void* GetRow(void* db, uint32_t id) {
+    if (!db) return nullptr;
+    return _GetRow(db, id);
+}
+
 // Memory scanning
 bool PatternScan(DWORD start, DWORD size, const char* pattern, const char* mask, DWORD* result) {
     DWORD patternLen = strlen(mask);

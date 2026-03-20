@@ -7,6 +7,7 @@
 #include "Morpher.h"
 #include "Utils.h"
 #include "WoWOffsets.h"
+#include "SpellMorph.h"
 
 // ================================================================
 // Timer & Threading
@@ -243,6 +244,7 @@ static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWOR
                     if (s_nearbyPlayerTicks >= 20) {
                         s_nearbyPlayerTicks = 0;
                         if (g_playerGuid != 0) {
+                            /*
                             char nearby[4096] = {0};
                             GetNearbyPlayers(g_playerGuid, nearby, sizeof(nearby));
                             char escaped[4096] = {0};
@@ -264,6 +266,7 @@ static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWOR
                                     FrameScript_Execute(luaCmd, "Transmorpher", 0);
                                 } __except(1) {}
                             }
+                            */
                         }
                     }
                 }
@@ -356,10 +359,14 @@ static DWORD WINAPI StealthThread(LPVOID lpParam) {
     }
 
     // UpdateDisplayInfo hook is currently disabled in code, just attempt it
-    InstallUpdateDisplayInfoHook();
+    // InstallUpdateDisplayInfoHook();
+    bool spellHookOk = InstallSpellVisualHook();
+    if (!spellHookOk) {
+        Log("WARNING: Failed to install spell visual hook!");
+    }
 
-    g_hookSuccess = mountHookOk;
-    g_initStatus = mountHookOk ? "ACTIVE" : "ACTIVE_NO_HOOKS";
+    g_hookSuccess = mountHookOk || spellHookOk;
+    g_initStatus = (mountHookOk || spellHookOk) ? "ACTIVE" : "ACTIVE_NO_HOOKS";
 
     // Install Timer on Main Thread
     if (!SetTimer(g_wowHwnd, MORPH_TIMER_ID, 50, MorphTimerProc)) {
@@ -404,6 +411,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
         Sleep(100); // Let any in-flight hook execution drain
         UninstallMountHook();
         UninstallUpdateDisplayInfoHook();
+        UninstallSpellVisualHook();
         UninstallTimeHook();
 
         Sleep(50);

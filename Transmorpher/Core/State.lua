@@ -189,6 +189,30 @@ function ns.SetFormMorph(groupID, displayID)
     end
 end
 
+function ns.GetSpellMorph(sourceSpellId)
+    if not TransmorpherCharacterState or not TransmorpherCharacterState.SpellMorphs then return nil end
+    local key = tonumber(sourceSpellId)
+    if not key then return nil end
+    local target = tonumber(TransmorpherCharacterState.SpellMorphs[key])
+    if target and target > 0 then
+        return target
+    end
+    return nil
+end
+
+function ns.SetSpellMorph(sourceSpellId, targetSpellId)
+    if not TransmorpherCharacterState then return end
+    if not TransmorpherCharacterState.SpellMorphs then TransmorpherCharacterState.SpellMorphs = {} end
+    local source = tonumber(sourceSpellId)
+    local target = tonumber(targetSpellId)
+    if not source or source <= 0 then return end
+    if target and target > 0 then
+        TransmorpherCharacterState.SpellMorphs[source] = target
+    else
+        TransmorpherCharacterState.SpellMorphs[source] = nil
+    end
+end
+
 -- ============================================================
 -- EQUIPPED ITEM HELPER
 -- ============================================================

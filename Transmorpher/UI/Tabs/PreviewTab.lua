@@ -23,12 +23,16 @@ local formsSubTab = CreateFrame("Frame", "$parentFormsSubTab", mainFrame.tabs.pr
 formsSubTab:SetPoint("TOPLEFT", 0, -50); formsSubTab:SetPoint("BOTTOMRIGHT"); formsSubTab:Hide()
 mainFrame.tabs.preview.formsSubTab = formsSubTab
 
+local spellsSubTab = CreateFrame("Frame", "$parentSpellsSubTab", mainFrame.tabs.preview)
+spellsSubTab:SetPoint("TOPLEFT", 0, -50); spellsSubTab:SetPoint("BOTTOMRIGHT"); spellsSubTab:Hide()
+mainFrame.tabs.preview.spellsSubTab = spellsSubTab
+
 -- Sub-tab Buttons
 local subTabBar = CreateFrame("Frame", nil, mainFrame.tabs.preview)
-subTabBar:SetSize(220, 30); subTabBar:SetPoint("TOPLEFT", 0, -20)
+subTabBar:SetSize(360, 30); subTabBar:SetPoint("TOPLEFT", 0, -20)
 
 local function CreateSubTabButton(parent, id, text)
-    local btn = CreateFrame("Button", nil, parent); btn:SetID(id); btn:SetSize(110, 30)
+    local btn = CreateFrame("Button", nil, parent); btn:SetID(id); btn:SetSize(90, 30)
     local bg = btn:CreateTexture(nil, "BACKGROUND"); bg:SetAllPoints(); bg:SetTexture(1,1,1,0); btn.bg = bg
     local line = btn:CreateTexture(nil, "OVERLAY"); line:SetHeight(2)
     line:SetPoint("BOTTOMLEFT", 15, 0); line:SetPoint("BOTTOMRIGHT", -15, 0)
@@ -46,19 +50,23 @@ end
 local btnItems = CreateSubTabButton(subTabBar, 1, "Items"); btnItems:SetPoint("LEFT", 0, 0)
 local btnSets = CreateSubTabButton(subTabBar, 2, "Sets"); btnSets:SetPoint("LEFT", btnItems, "RIGHT", 0, 0)
 local btnForms = CreateSubTabButton(subTabBar, 3, "Forms"); btnForms:SetPoint("LEFT", btnSets, "RIGHT", 0, 0)
+local btnSpells = CreateSubTabButton(subTabBar, 4, "Spells"); btnSpells:SetPoint("LEFT", btnForms, "RIGHT", 0, 0)
 
 local function ShowPreviewSubTab(id)
     local showItems = id == 1
     local showSets = id == 2
     local showForms = id == 3
+    local showSpells = id == 4
 
     if showItems then itemsSubTab:Show() else itemsSubTab:Hide() end
     if showSets then setsSubTab:Show() else setsSubTab:Hide() end
     if showForms then formsSubTab:Show() else formsSubTab:Hide() end
+    if showSpells then spellsSubTab:Show() else spellsSubTab:Hide() end
 
     btnItems:SetActive(showItems)
     btnSets:SetActive(showSets)
     btnForms:SetActive(showForms)
+    btnSpells:SetActive(showSpells)
 
     if showSets and not setsSubTab.initialized then
         if ns.InitSetsTab then ns.InitSetsTab(setsSubTab); setsSubTab.initialized = true end
@@ -66,12 +74,16 @@ local function ShowPreviewSubTab(id)
     if showForms and not formsSubTab.initialized then
         if ns.InitFormsTab then ns.InitFormsTab(formsSubTab); formsSubTab.initialized = true end
     end
+    if showSpells and not spellsSubTab.initialized then
+        if ns.InitSpellsTab then ns.InitSpellsTab(spellsSubTab); spellsSubTab.initialized = true end
+    end
 
     PlaySound("gsTitleOptionOK")
 end
 btnItems:SetScript("OnClick", function() ShowPreviewSubTab(1) end)
 btnSets:SetScript("OnClick", function() ShowPreviewSubTab(2) end)
 btnForms:SetScript("OnClick", function() ShowPreviewSubTab(3) end)
+btnSpells:SetScript("OnClick", function() ShowPreviewSubTab(4) end)
 mainFrame.tabs.preview.ShowSubTab = ShowPreviewSubTab
 mainFrame.tabs.preview:SetScript("OnShow", function(self)
     if not self.tabInitialized then

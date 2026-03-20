@@ -33,6 +33,7 @@ local function InitCharacterState()
             TitleID = nil,
             WeaponSets = {},
             Forms = {},
+            SpellMorphs = {},
             HiddenItems = {}, -- [slotId] = true
         }
     end
@@ -40,6 +41,7 @@ local function InitCharacterState()
     if not TransmorpherCharacterState.HiddenItems then TransmorpherCharacterState.HiddenItems = {} end
     if not TransmorpherCharacterState.Mounts then TransmorpherCharacterState.Mounts = {} end
     if not TransmorpherCharacterState.WeaponSets then TransmorpherCharacterState.WeaponSets = {} end
+    if not TransmorpherCharacterState.SpellMorphs then TransmorpherCharacterState.SpellMorphs = {} end
 end
 
 -- Helper: get weapon set key from equipped weapons
@@ -145,6 +147,28 @@ local function TrackMorphCommand(cmd)
         elseif prefix == "TITLE_RESET" then
             TransmorpherCharacterState.TitleID = nil
             ns.networkResetPending = true
+        elseif prefix == "SPELL_MORPH" and parts[2] and parts[3] then
+            local sourceSpellId = tonumber(parts[2])
+            local targetSpellId = tonumber(parts[3])
+            if sourceSpellId and sourceSpellId > 0 then
+                if not TransmorpherCharacterState.SpellMorphs then TransmorpherCharacterState.SpellMorphs = {} end
+                if targetSpellId and targetSpellId > 0 then
+                    TransmorpherCharacterState.SpellMorphs[sourceSpellId] = targetSpellId
+                else
+                    TransmorpherCharacterState.SpellMorphs[sourceSpellId] = nil
+                end
+            end
+        elseif prefix == "SPELL_RESET" and parts[2] then
+            local sourceSpellId = tonumber(parts[2])
+            if sourceSpellId and sourceSpellId > 0 and TransmorpherCharacterState.SpellMorphs then
+                TransmorpherCharacterState.SpellMorphs[sourceSpellId] = nil
+            end
+        elseif prefix == "SPELL_RESET_ALL" then
+            if TransmorpherCharacterState.SpellMorphs then
+                wipe(TransmorpherCharacterState.SpellMorphs)
+            else
+                TransmorpherCharacterState.SpellMorphs = {}
+            end
 
         elseif prefix == "RESET" and parts[2] then
             if parts[2] == "ALL" then
@@ -196,6 +220,7 @@ local function TrackMorphCommand(cmd)
                 end
                 -- Preserve Forms
                 if not TransmorpherCharacterState.Forms then TransmorpherCharacterState.Forms = {} end
+                if not TransmorpherCharacterState.SpellMorphs then TransmorpherCharacterState.SpellMorphs = {} end
             else
                 local slotId = tonumber(parts[2])
                 if slotId then
@@ -334,12 +359,22 @@ function ns.InitializeDLLSettings()
         TransmorpherCharacterState.TitleID = TRANSMORPHER_DLL_STATE.title
         TransmorpherCharacterState.Items = TransmorpherCharacterState.Items or {}
         TransmorpherCharacterState.HiddenItems = TransmorpherCharacterState.HiddenItems or {}
+        TransmorpherCharacterState.SpellMorphs = TransmorpherCharacterState.SpellMorphs or {}
         
         for s, id in pairs(TRANSMORPHER_DLL_STATE.items) do
             if id == 0 then
                 TransmorpherCharacterState.HiddenItems[s] = true
             else
                 TransmorpherCharacterState.Items[s] = id
+            end
+        end
+        if TRANSMORPHER_DLL_STATE.spells then
+            for sourceSpellId, targetSpellId in pairs(TRANSMORPHER_DLL_STATE.spells) do
+                local source = tonumber(sourceSpellId)
+                local target = tonumber(targetSpellId)
+                if source and source > 0 and target and target > 0 then
+                    TransmorpherCharacterState.SpellMorphs[source] = target
+                end
             end
         end
         
@@ -451,6 +486,13 @@ function ns.SendFullMorphState()
                 table.insert(cmdQueue, "ITEM:" .. slot .. ":" .. item)
             end
         end
+        if TransmorpherCharacterState.SpellMorphs then
+            for sourceSpellId, targetSpellId in pairs(TransmorpherCharacterState.SpellMorphs) do
+                if sourceSpellId and targetSpellId and sourceSpellId > 0 and targetSpellId > 0 then
+                    table.insert(cmdQueue, "SPELL_MORPH:" .. sourceSpellId .. ":" .. targetSpellId)
+                end
+            end
+        end
 
         if #cmdQueue > 0 then
             ns.SendRawMorphCommand(table.concat(cmdQueue, "|"))
@@ -534,6 +576,13 @@ function ns.SendFullMorphState()
         for slot, isHidden in pairs(TransmorpherCharacterState.HiddenItems) do
             if isHidden and not TransmorpherCharacterState.Items[slot] then
                 table.insert(cmdQueue, "ITEM:" .. slot .. ":-1")
+            end
+        end
+    end
+    if TransmorpherCharacterState.SpellMorphs then
+        for sourceSpellId, targetSpellId in pairs(TransmorpherCharacterState.SpellMorphs) do
+            if sourceSpellId and targetSpellId and sourceSpellId > 0 and targetSpellId > 0 then
+                table.insert(cmdQueue, "SPELL_MORPH:" .. sourceSpellId .. ":" .. targetSpellId)
             end
         end
     end

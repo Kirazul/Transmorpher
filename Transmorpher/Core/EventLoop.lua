@@ -269,7 +269,7 @@ mainFrame:SetScript("OnEvent", function(self, event, ...)
         end
         
         if not TransmorpherCharacterState then
-            TransmorpherCharacterState = {Items={}, Morph=nil, Scale=nil, MountDisplay=nil, PetDisplay=nil, Mounts={}, HunterPetDisplay=nil, HunterPetScale=nil, EnchantMH=nil, EnchantOH=nil, TitleID=nil, Forms={}, WeaponSets={}}
+            TransmorpherCharacterState = {Items={}, Morph=nil, Scale=nil, MountDisplay=nil, PetDisplay=nil, Mounts={}, HunterPetDisplay=nil, HunterPetScale=nil, EnchantMH=nil, EnchantOH=nil, TitleID=nil, Forms={}, SpellMorphs={}, WeaponSets={}}
         end
         
         -- RECOVER FROM DLL (Fixes "mount doesnt show on first login" when WTF is wiped)
@@ -294,11 +294,22 @@ mainFrame:SetScript("OnEvent", function(self, event, ...)
                     end
                 end
             end
+            if TRANSMORPHER_DLL_STATE.spells then
+                TransmorpherCharacterState.SpellMorphs = TransmorpherCharacterState.SpellMorphs or {}
+                for sourceSpellId, targetSpellId in pairs(TRANSMORPHER_DLL_STATE.spells) do
+                    local source = tonumber(sourceSpellId)
+                    local target = tonumber(targetSpellId)
+                    if source and source > 0 and target and target > 0 then
+                        TransmorpherCharacterState.SpellMorphs[source] = target
+                    end
+                end
+            end
             -- Clear it so we don't restore it again on every reload
             TRANSMORPHER_DLL_STATE = nil
         end
         if not TransmorpherCharacterState.Items then TransmorpherCharacterState.Items = {} end
         if not TransmorpherCharacterState.Forms then TransmorpherCharacterState.Forms = {} end
+        if not TransmorpherCharacterState.SpellMorphs then TransmorpherCharacterState.SpellMorphs = {} end
         if not TransmorpherCharacterState.Mounts then TransmorpherCharacterState.Mounts = {} end
         -- Only reset MountHidden if it wasn't explicitly saved
         if TransmorpherCharacterState.MountHidden == nil then
@@ -337,7 +348,7 @@ mainFrame:SetScript("OnEvent", function(self, event, ...)
             TransmorpherCharacterState = {
                 Items = {}, Morph = nil, Scale = nil, MountDisplay = nil, 
                 PetDisplay = nil, Mounts = {}, HiddenItems = {}, WeaponSets = {}, 
-                Forms = {}, _lastGUID = currentGUID
+                Forms = {}, SpellMorphs = {}, _lastGUID = currentGUID
             }
         end
         TransmorpherCharacterState._lastGUID = currentGUID

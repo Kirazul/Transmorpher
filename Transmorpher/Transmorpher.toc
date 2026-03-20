@@ -50,6 +50,7 @@ UI\Tabs\CombatPetsTab.lua
 UI\Tabs\SettingsTab.lua
 UI\Tabs\MiscTab.lua
 UI\Tabs\FormsTab.lua
+UI\Tabs\SpellsTab.lua
 
 Core\P2PSync.lua
 Core\EventLoop.lua

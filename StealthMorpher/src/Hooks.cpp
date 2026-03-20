@@ -361,7 +361,13 @@ void __declspec(naked) MountDisplayHook()
         pop edx
         pop eax
         
+        // Conditional Write: Only write if value is different.
+        // This prevents the engine from marking descriptors as 'dirty' 
+        // and triggering unnecessary model reloads (UpdateDisplayInfo).
+        cmp [eax+edx*4], ecx
+        je skip_final_write
         mov [eax+edx*4], ecx
+    skip_final_write:
         pop ebp
         ret 8
     }
@@ -440,7 +446,7 @@ static BYTE  g_updateDisplayHookOrigBytes[6] = {0};
 
 // Flag to track which prologue variant we're dealing with
 bool g_updateDisplayPrologueIs83 = false;
-BYTE g_updateDisplayPrologueSub = 0;  // The sub esp operand for 83 EC variant
+uint32_t g_updateDisplayPrologueSub = 0;  // The sub esp operand (1-byte or 4-byte)
 
 void __declspec(naked) UpdateDisplayInfoHook()
 {
@@ -500,14 +506,18 @@ void __declspec(naked) UpdateDisplayInfoHook()
 
     write_mount:
         cmp ebx, 0xFFFFFFFF // HIDDEN_SENTINEL
-        jne do_write_v
+        jne do_cmp_mount
         xor ebx, ebx
-    do_write_v:
+    do_cmp_mount:
+        cmp [eax+0x114], ebx
+        je handle_base_morph
         mov [eax+0x114], ebx
 
     handle_base_morph:
         mov ebx, dword ptr [g_morphDisplay]
         cmp ebx, 0
+        je pop_ebx_and_cont
+        cmp [eax+0x10C], ebx
         je pop_ebx_and_cont
         mov [eax+0x10C], ebx
 
@@ -527,10 +537,9 @@ void __declspec(naked) UpdateDisplayInfoHook()
         cmp byte ptr [g_updateDisplayPrologueIs83], 1
         je short_sub_variant
 
-        // 81 EC variant: sub esp, DWORD (read 4-byte operand at hookAddr+5)
+        // 81 EC variant: sub esp, DWORD (use saved g_updateDisplayPrologueSub)
         push eax
-        mov eax, g_updateDisplayHookAddr
-        mov eax, [eax+5]
+        mov eax, [g_updateDisplayPrologueSub]
         sub esp, eax
         pop eax
         push g_updateDisplayHookAddr
@@ -538,10 +547,9 @@ void __declspec(naked) UpdateDisplayInfoHook()
         ret
 
     short_sub_variant:
-        // 83 EC variant: sub esp, BYTE (read 1-byte operand at hookAddr+5)
+        // 83 EC variant: sub esp, BYTE (use saved g_updateDisplayPrologueSub)
         push eax
-        xor eax, eax
-        mov al, byte ptr [g_updateDisplayPrologueSub]
+        mov eax, [g_updateDisplayPrologueSub]
         sub esp, eax
         pop eax
         push g_updateDisplayHookAddr
@@ -581,12 +589,13 @@ bool InstallUpdateDisplayInfoHook()
         if (ptr[3] == 0x81 && ptr[4] == 0xEC) {
             // sub esp, DWORD — 9 bytes total (55 8B EC 81 EC xx xx xx xx)
             g_updateDisplayPrologueIs83 = false;
+            g_updateDisplayPrologueSub = *(uint32_t*)&ptr[5]; // Save the operand
             hookLen = 9;
-            Log("UpdateDisplayInfo prologue: sub esp, DWORD (81 EC)");
+            Log("UpdateDisplayInfo prologue: sub esp, DWORD (81 EC) val=0x%X", g_updateDisplayPrologueSub);
         } else if (ptr[3] == 0x83 && ptr[4] == 0xEC) {
             // sub esp, BYTE — 6 bytes total (55 8B EC 83 EC xx)
             g_updateDisplayPrologueIs83 = true;
-            g_updateDisplayPrologueSub = ptr[5]; // Save the operand
+            g_updateDisplayPrologueSub = (uint32_t)ptr[5]; // Save the operand
             hookLen = 6;
             Log("UpdateDisplayInfo prologue: sub esp, 0x%02X (83 EC)", ptr[5]);
         } else {
