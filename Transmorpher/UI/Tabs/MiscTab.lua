@@ -105,41 +105,12 @@ local function CreateOptCheckbox(name, label, tooltip, settingKey, cmdPrefix)
     return cb
 end
 
-local function SetAllOptimization(state)
-    local settings = ns.GetSettings()
-    local keys = {
-        "hideAllSpells", "hidePrecast", "hideCast", "hideChannel",
-        "hideImpactTarget", "hideImpactArea", "hideGround", 
-        "hideMissile", "hideAura", "hideAudio"
-    }
-    local batch = {}
-    for _, key in ipairs(keys) do
-        settings[key] = state
-        local cmd = "HIDE_" .. (key:gsub("hide", ""):upper())
-        if key == "hideImpactTarget" then cmd = "HIDE_IMPACT_TARGET"
-        elseif key == "hideImpactArea" then cmd = "HIDE_IMPACT_AREA"
-        end
-        table.insert(batch, "SET:" .. cmd .. ":" .. (state and "1" or "0"))
-    end
-    if ns.IsMorpherReady() then
-        ns.SendMorphCommand(table.concat(batch, "|"))
-    end
-    -- Refresh UI checkboxes
-    for key, cb in pairs(optimizationCheckboxes) do
-        cb:SetChecked(state)
-    end
-end
 
-local btnEnableAll = ns.CreateGoldenButton("$parentEnableAll", optCard)
-btnEnableAll:SetPoint("TOPRIGHT", -12, -12); btnEnableAll:SetSize(90, 22); btnEnableAll:SetText("Disable All Spells")
-btnEnableAll:SetScript("OnClick", function() SetAllOptimization(true); PlaySound("igMainMenuOptionCheckBoxOn") end)
 
-local btnDisableAll = ns.CreateGoldenButton("$parentDisableAll", optCard)
-btnDisableAll:SetPoint("RIGHT", btnEnableAll, "LEFT", -8, 0); btnDisableAll:SetSize(90, 22); btnDisableAll:SetText("Show All")
-btnDisableAll:SetScript("OnClick", function() SetAllOptimization(false); PlaySound("igMainMenuOptionCheckBoxOff") end)
 
 local cbHideAll = CreateOptCheckbox("HideAll", "|cffFF4444[MASTER] Hide ALL Spells|r", "Completely disables all spell visuals globally for peak FPS.", "hideAllSpells", "HIDE_ALL")
-cbHideAll:SetPoint("TOPLEFT", 16, -60)
+cbHideAll:SetPoint("TOPLEFT", 16, -40)
+
 
 local sep1 = optCard:CreateTexture(nil, "ARTWORK")
 sep1:SetSize(350, 1); sep1:SetPoint("TOPLEFT", 16, -88); sep1:SetTexture(1, 1, 1, 0.05)
