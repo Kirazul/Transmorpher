@@ -1007,10 +1007,11 @@ local function AutoApplyTalentBoundLoadout()
     BuildListFrames()
     UpdateLoadoutPreview(loadout)
     
-    -- Check if we are really changing something to avoid spam
-    if ns.activeLoadoutUid ~= loadout.uid then
-        ApplyLoadout(loadout, ns.activeLoadoutUid == nil)
-    end
+    -- Always apply on actual talent-group switch.
+    -- Relying on ns.activeLoadoutUid can fail after reload/login because
+    -- activeLoadoutUid is runtime-only and may already match while the DLL/UI
+    -- state is not actually applied for this session.
+    ApplyLoadout(loadout, false)
 end
 
 local talentApplyDelay = CreateFrame("Frame")

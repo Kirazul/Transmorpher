@@ -110,12 +110,18 @@ WowObject* GetPlayer() {
         if (clientConnection) {
             uint32_t objectManager = *(uint32_t*)(uintptr_t)(clientConnection + P_OBJECT_MGR_OFFSET);
             if (objectManager) {
-                uint32_t playerObj = *(uint32_t*)(uintptr_t)(objectManager + 0x24);
-                if (playerObj) {
-                    WowObject* player = (WowObject*)(uintptr_t)playerObj;
-                    if (player->descriptors) return player;
+            uint64_t localGuid = *(uint64_t*)(uintptr_t)(objectManager + 0xC0);
+            if (localGuid == 0) return nullptr;
+
+            uint32_t playerObj = *(uint32_t*)(uintptr_t)(objectManager + 0x24);
+            if (playerObj) {
+                WowObject* player = (WowObject*)(uintptr_t)playerObj;
+                if (player->descriptors) {
+                    uint64_t objGuid = *(uint64_t*)player->descriptors;
+                    if (objGuid == localGuid) return player;
                 }
             }
+        }
         }
     } __except(1) {}
 

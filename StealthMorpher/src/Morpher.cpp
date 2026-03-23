@@ -1625,8 +1625,14 @@ void MorphGuard(WowObject* player) {
     // Lua mount state arrives late.
     if (g_updateCooldown <= 0) {
         __try {
+            uint32_t currentDisp = *(uint32_t*)(desc + UNIT_FIELD_DISPLAYID);
             uint32_t curMount = *(uint32_t*)(desc + UNIT_FIELD_MOUNTDISPLAYID);
-            if (curMount == 0) {
+            
+            // GHOST PROTECTION & LEAKAGE PREVENTION
+            // Skip mount morphing if the player is a ghost or if the addon says we are dismounted.
+            bool skipMount = (currentDisp == 16543 || currentDisp == 16544 || g_luaMounted == 0);
+
+            if (curMount == 0 || skipMount) {
                 g_lastAppliedMount = 0;
             } else {
                 // Capture original mount if it's a native ID

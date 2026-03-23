@@ -117,6 +117,9 @@ static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWOR
         if (player && player->descriptors) {
             extern DWORD g_playerDescBase;
             g_playerDescBase = (DWORD)(uintptr_t)player->descriptors;
+        } else {
+            extern DWORD g_playerDescBase;
+            g_playerDescBase = 0;
         }
 
         // World entry detection

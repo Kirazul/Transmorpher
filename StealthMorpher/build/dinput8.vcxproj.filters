@@ -1,36 +1,36 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="C:\Users\KIRA\Desktop\stable - Copie (3)\StealthMorpher\src\dllmain.cpp">
+    <ClCompile Include="C:\Users\KIRA\Desktop\stable - Copie (3) - Copie - Copie - Copie\StealthMorpher\src\dllmain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\KIRA\Desktop\stable - Copie (3)\StealthMorpher\src\Utils.cpp">
+    <ClCompile Include="C:\Users\KIRA\Desktop\stable - Copie (3) - Copie - Copie - Copie\StealthMorpher\src\Utils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\KIRA\Desktop\stable - Copie (3)\StealthMorpher\src\Proxy.cpp">
+    <ClCompile Include="C:\Users\KIRA\Desktop\stable - Copie (3) - Copie - Copie - Copie\StealthMorpher\src\Proxy.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\KIRA\Desktop\stable - Copie (3)\StealthMorpher\src\Hooks.cpp">
+    <ClCompile Include="C:\Users\KIRA\Desktop\stable - Copie (3) - Copie - Copie - Copie\StealthMorpher\src\Hooks.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\KIRA\Desktop\stable - Copie (3)\StealthMorpher\src\Morpher.cpp">
+    <ClCompile Include="C:\Users\KIRA\Desktop\stable - Copie (3) - Copie - Copie - Copie\StealthMorpher\src\Morpher.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\KIRA\Desktop\stable - Copie (3)\StealthMorpher\src\SpellMorph.cpp">
+    <ClCompile Include="C:\Users\KIRA\Desktop\stable - Copie (3) - Copie - Copie - Copie\StealthMorpher\src\SpellMorph.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="C:\Users\KIRA\Desktop\stable - Copie (3)\StealthMorpher\CMakeLists.txt" />
+    <CustomBuild Include="C:\Users\KIRA\Desktop\stable - Copie (3) - Copie - Copie - Copie\StealthMorpher\CMakeLists.txt" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="C:\Users\KIRA\Desktop\stable - Copie (3)\StealthMorpher\src\dinput8_exports.def">
+    <None Include="C:\Users\KIRA\Desktop\stable - Copie (3) - Copie - Copie - Copie\StealthMorpher\src\dinput8_exports.def">
       <Filter>Source Files</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Source Files">
-      <UniqueIdentifier>{51923082-3C49-3725-91AD-A4681FA038A7}</UniqueIdentifier>
+      <UniqueIdentifier>{D93E21DE-320D-3D7E-84C2-F10B3726EBBD}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

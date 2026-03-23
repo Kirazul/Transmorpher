@@ -137,16 +137,41 @@ void __declspec(naked) MountDisplayHook()
         cmp byte ptr [g_mountHookBypass], 1
         je do_original
 
-        // GET LOCAL PLAYER GUID (Using globally captured g_playerGuid)
+        // 1. QUICK CHECK: Descriptor base must match globally verified player base
+        push ebx
+        mov ebx, [g_playerDescBase]
+        test ebx, ebx
+        jz check_guid_fallback
+        cmp eax, ebx
+        je is_player_verified_asm
+        pop ebx
+        jmp do_original
+
+    check_guid_fallback:
+        // 2. GUID IDENTIFICATION (Using globally captured g_playerGuid)
         push edi
         mov edi, offset g_playerGuid
         mov ebx, [edi]      // playerGuid Low
+        test ebx, ebx       // Safety: if GUID is 0, we can't identify reliably
+        jz pop_edi_ebx_orig_v
+        
         cmp [eax], ebx
-        jne pop_edi_orig_v
+        jne pop_edi_ebx_orig_v
         mov ebx, [edi+4]    // playerGuid High
         cmp [eax+4], ebx
-        jne pop_edi_orig_v
+        jne pop_edi_ebx_orig_v
+        
         pop edi
+        pop ebx
+        jmp is_player_verified
+
+    pop_edi_ebx_orig_v:
+        pop edi
+        pop ebx
+        jmp do_original
+
+    is_player_verified_asm:
+        pop ebx
 
         // It is the player!
         // ==========================================================
@@ -156,9 +181,10 @@ void __declspec(naked) MountDisplayHook()
         je do_original
         jmp is_player_verified
 
-    pop_edi_orig_v:
-        pop edi
+    pop_ebx_do_original:
+        pop ebx
         jmp do_original
+
 
     is_player_verified:
 
@@ -173,6 +199,16 @@ void __declspec(naked) MountDisplayHook()
 
     save_mount_orig:
         mov dword ptr [g_origMount], ecx
+
+        // GHOST PROTECTION: Never morph mount visuals if the player is a ghost.
+        push ebx
+        mov ebx, [eax+0x10C] // UNIT_FIELD_DISPLAYID (Index 0x43 * 4 = 0x10C)
+        cmp ebx, 16543
+        je pop_ebx_do_original
+        cmp ebx, 16544
+        je pop_ebx_do_original
+        pop ebx
+
         cmp dword ptr [g_morphMount], 0
         je do_original
 
@@ -502,13 +538,26 @@ void __declspec(naked) UpdateDisplayInfoHook()
         // GUID IDENTIFICATION: Only proceed if it is the local player
         push edi
         push ebx
+        
+        // 1. Match against verified player descriptor base
+        mov ebx, [g_playerDescBase]
+        test ebx, ebx
+        jz check_guid_fallback_v
+        cmp eax, ebx
+        je is_player_verified_v
+        
+    check_guid_fallback_v:
+        // 2. Fallback to GUID check
         mov edi, offset g_playerGuid
         mov ebx, [edi]      // playerGuid Low
+        test ebx, ebx
+        jz pop_ebx_edi_orig_v_asm
+        
         cmp [eax], ebx
-        jne pop_ebx_edi_orig_v
+        jne pop_ebx_edi_orig_v_asm
         mov ebx, [edi + 4]  // playerGuid High
         cmp [eax + 4], ebx
-        jne pop_ebx_edi_orig_v
+        jne pop_ebx_edi_orig_v_asm
         
         pop ebx
         pop edi
@@ -517,10 +566,16 @@ void __declspec(naked) UpdateDisplayInfoHook()
         mov [g_playerDescBase], eax
         jmp do_verified_v
 
-    pop_ebx_edi_orig_v:
+    pop_ebx_edi_orig_v_asm:
         pop ebx
         pop edi
         jmp do_orig_v
+
+    is_player_verified_v:
+        pop ebx
+        pop edi
+        jmp do_verified_v
+
 
     do_verified_v:
         push ebx
@@ -531,6 +586,20 @@ void __declspec(naked) UpdateDisplayInfoHook()
         mov ebx, [eax+0x114] 
         test ebx, ebx
         jz handle_items_morph
+
+        // LEAKAGE PREVENTION: Only morph if the Transmorpher addon says we are mounted.
+        // This fixes the issue where ghost gryphons or vehicles were overridden
+        // because WoW's mount field was non-zero.
+        cmp dword ptr [g_luaMounted], 1
+        jne handle_items_morph
+
+        // GHOST PROTECTION: Never morph mount visuals if the player is a ghost.
+        // Ghost IDs: 16543 (Male), 16544 (Female).
+        mov ebx, [eax+UNIT_FIELD_DISPLAYID]
+        cmp ebx, 16543
+        je handle_items_morph
+        cmp ebx, 16544
+        je handle_items_morph
 
         mov ebx, dword ptr [g_morphMount]
         cmp ebx, 0

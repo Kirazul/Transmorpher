@@ -493,7 +493,7 @@ mainFrame:SetScript("OnEvent", function(self, event, ...)
     elseif event == "UNIT_MODEL_CHANGED" then
         local unit = ...
         if unit == "player" then
-            local curMounted = IsMounted() or false
+            local curMounted = (IsMounted() and not UnitInVehicle("player")) or false
             if curMounted ~= lastKnownMounted then
                 lastKnownMounted = curMounted
                 if curMounted then
