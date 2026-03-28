@@ -76,7 +76,7 @@ Transmorpher_Titles = {
 {id=107, name="Grand Master Miner %s"},
 {id=108, name="Grand Master Skinner %s"},
 {id=109, name="Grand Master Tailor %s"},
-{id=110, name="Combatant %s"}, -- add
+{id=110, name="%s of Quel'Thalas %s"}, -- correct
 {id=111, name="%s of Argus"}, -- add
 {id=112, name="%s of Khaz Modan"}, -- add
 {id=113, name="%s of Gnomeregan"},
