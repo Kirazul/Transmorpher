@@ -108,18 +108,12 @@ Current release: **1.2.0**
 - Does not modify server data
 
   
-![Screenshot](images/screenshot1.png)
+![Demo](images/export-1775061220012.gif)
 
 ## Morph System
 
-![Screenshot](images/Capture%20d'écran%202026-03-04%20132233.png)
+![Screenshot](images/WoWScrnShot_040226_003520.jpg)
 
-![Screenshot](images/Capture%20d'écran%202026-03-04%20132756.png)
+![Screenshot](images/WoWScrnShot_040226_003718.jpg)
 
-![Screenshot](images/Capture%20d'écran%202026-03-04%20132847.png)
-
-![Screenshot](images/Capture%20d'écran%202026-03-04%20132923.png)
-
-![Screenshot](images/Capture%20d'écran%202026-03-04%20133238.png)
-
-![Screenshot](images/Capture%20d'écran%202026-03-04%20134457.png)
+![Screenshot](images/WoWScrnShot_040226_004158.jpg)
