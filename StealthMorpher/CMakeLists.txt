@@ -15,6 +15,7 @@ set(SOURCES
     "${CMAKE_SOURCE_DIR}/src/Proxy.cpp"
     "${CMAKE_SOURCE_DIR}/src/Hooks.cpp"
     "${CMAKE_SOURCE_DIR}/src/Morpher.cpp"
+    "${CMAKE_SOURCE_DIR}/src/SpellMorph.cpp"
 )
 
 # Create the DLL

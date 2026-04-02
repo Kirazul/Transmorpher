@@ -293,6 +293,7 @@ local selectedLoadoutId = nil
 local activeLookId = "CURRENT"
 local talentAutoState = {group=nil, uid=nil, t=0}
 local lastSeenTalentGroup = nil
+local loginTime = GetTime()
 local BuildListFrames
 
 local function EnsureLoadoutUid(loadout)
@@ -604,10 +605,13 @@ local function UpdateLoadoutPreview(loadout)
     end
 end
 
-local function ApplyLoadout(loadout)
+local function ApplyLoadout(loadout, isInitial)
     if not ns.IsMorpherReady() or not loadout or loadout.isCurrent then return end
+    
+    ns.isApplyingLoadout = true
+    ns.activeLoadoutUid = loadout.uid
 
-    PlaySound("LevelUp")
+    if not isInitial then PlaySound("LevelUp") end
     local state = TransmorpherCharacterState
     local stateItems = (state and state.Items) or {}
     local stateHidden = (state and state.HiddenItems) or {}
@@ -797,6 +801,8 @@ local function ApplyLoadout(loadout)
     if didChange and ns.ScheduleDressingRoomSync then ns.ScheduleDressingRoomSync(0.05) end
     ns.UpdateSpecialSlots()
     
+    ns.isApplyingLoadout = false
+    
     -- Add flash to special slots
     local ss = mainFrame.specialSlots
     if ss then
@@ -811,45 +817,12 @@ local function ApplyLoadout(loadout)
         ns.BroadcastMorphState(true)
     end
 
-    SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Loadout '"..loadout.name.."' applied!")
-end
-
-local function AutoApplyTalentBoundLoadout()
-    local group = GetActiveTalentGroupSafe()
-    local uid = GetTalentLoadoutBindings()[group]
-    if not uid then return end
-    local idx, loadout = FindLoadoutByUid(uid)
-    if not loadout then
-        GetTalentLoadoutBindings()[group] = nil
-        return
+    if not isInitial then
+        SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Loadout '"..loadout.name.."' applied!")
     end
-    local now = GetTime()
-    if talentAutoState.group == group and talentAutoState.uid == uid and (now - talentAutoState.t) < 1.5 then
-        return
-    end
-    talentAutoState.group = group
-    talentAutoState.uid = uid
-    talentAutoState.t = now
-    activeLookId = idx
-    BuildListFrames()
-    UpdateLoadoutPreview(loadout)
-    ApplyLoadout(loadout)
 end
 
-local talentApplyDelay = CreateFrame("Frame")
-talentApplyDelay:Hide()
-talentApplyDelay.elapsed = 0
-talentApplyDelay:SetScript("OnUpdate", function(self, elapsed)
-    self.elapsed = self.elapsed + elapsed
-    if self.elapsed < 0.3 then return end
-    self:Hide()
-    AutoApplyTalentBoundLoadout()
-end)
 
-local function ScheduleAutoApplyTalentLoadout()
-    talentApplyDelay.elapsed = 0
-    talentApplyDelay:Show()
-end
 
 function BuildListFrames()
     local saved = _G["TransmorpherLoadoutsAccount"]
@@ -1014,6 +987,48 @@ function BuildListFrames()
     RefreshSpecBindButtons()
 end
 
+local function AutoApplyTalentBoundLoadout()
+    local group = GetActiveTalentGroupSafe()
+    local uid = GetTalentLoadoutBindings()[group]
+    if not uid then return end
+    local idx, loadout = FindLoadoutByUid(uid)
+    if not loadout then
+        GetTalentLoadoutBindings()[group] = nil
+        return
+    end
+    local now = GetTime()
+    if talentAutoState.group == group and talentAutoState.uid == uid and (now - talentAutoState.t) < 1.5 then
+        return
+    end
+    talentAutoState.group = group
+    talentAutoState.uid = uid
+    talentAutoState.t = now
+    activeLookId = idx
+    BuildListFrames()
+    UpdateLoadoutPreview(loadout)
+    
+    -- Always apply on actual talent-group switch.
+    -- Relying on ns.activeLoadoutUid can fail after reload/login because
+    -- activeLoadoutUid is runtime-only and may already match while the DLL/UI
+    -- state is not actually applied for this session.
+    ApplyLoadout(loadout, false)
+end
+
+local talentApplyDelay = CreateFrame("Frame")
+talentApplyDelay:Hide()
+talentApplyDelay.elapsed = 0
+talentApplyDelay:SetScript("OnUpdate", function(self, elapsed)
+    self.elapsed = self.elapsed + elapsed
+    if self.elapsed < 0.3 then return end
+    self:Hide()
+    AutoApplyTalentBoundLoadout()
+end)
+
+local function ScheduleAutoApplyTalentLoadout()
+    talentApplyDelay.elapsed = 0
+    talentApplyDelay:Show()
+end
+
 local listInit = CreateFrame("Frame")
 listInit:RegisterEvent("ADDON_LOADED")
 listInit:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED")
@@ -1025,6 +1040,14 @@ listInit:SetScript("OnEvent", function(self, event, aName)
         BuildListFrames()
     elseif event == "ACTIVE_TALENT_GROUP_CHANGED" then
         local currentGroup = GetActiveTalentGroupSafe()
+        
+        -- SUPPRESS ON LOGIN: Ignore spec detection for the first 5 seconds of login
+        -- to prevent auto-applying loadouts that were already handled by the DLL or SavedVars.
+        if (GetTime() - loginTime) < 5 then
+            lastSeenTalentGroup = currentGroup
+            return
+        end
+
         if currentGroup == lastSeenTalentGroup then return end
         lastSeenTalentGroup = currentGroup
         ScheduleAutoApplyTalentLoadout()

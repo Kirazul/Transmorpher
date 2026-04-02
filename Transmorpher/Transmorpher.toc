@@ -1,10 +1,10 @@
 ## Interface: 30300
 ## Author: Kirazul
 ## Title: Transmorpher
-## Notes: Client-side Transmog system for WotLK 3.3.5a with optional multiplayer sync. Requires dinput8.dll (or Universal Proxy). v1.2.0.
+## Notes: Client-side Transmog system for WotLK 3.3.5a with optional multiplayer sync. Requires dinput8.dll (or Universal Proxy). v1.2.2.
 ## SavedVariables: TransmorpherSavedLooks, TransmorpherMorphFavorites, TransmorpherSettings, TransmorpherLoadoutsAccount
 ## SavedVariablesPerCharacter: TransmorpherCharacterState, TransmorpherSettingsPerChar
-## Version: 1.2.0
+## Version: 1.2.2
 
 db\ItemsDB.lua
 db\ItemsAPI.lua
@@ -31,7 +31,6 @@ Core\Utils.lua
 Core\DLLBridge.lua
 Core\State.lua
 Core\MountManager.lua
-
 UI\GlowSystem.lua
 UI\MainFrame.lua
 UI\DressingRoomSetup.lua
@@ -50,6 +49,7 @@ UI\Tabs\CombatPetsTab.lua
 UI\Tabs\SettingsTab.lua
 UI\Tabs\MiscTab.lua
 UI\Tabs\FormsTab.lua
+UI\Tabs\SpellsTab.lua
 
 Core\P2PSync.lua
 Core\EventLoop.lua

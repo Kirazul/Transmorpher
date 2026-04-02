@@ -126,7 +126,7 @@ createCheckboxRow(persistenceCard, "Save mount morph per character", "saveMountM
 createCheckboxRow(persistenceCard, "Save pet morph per character", "savePetMorph", -110, "Remember your companion pet morph for this character")
 createCheckboxRow(persistenceCard, "Save combat pet morph per character", "saveCombatPetMorph", -144, "Remember your hunter pet morph for this character")
 
-local behaviorCard = createCard(scrollChild, "Behavior", -202, 146)
+local behaviorCard = createCard(scrollChild, "Behavior", -202, 112)
 createCheckboxRow(behaviorCard, "Show Warlock Metamorphosis", "showMetamorphosis", -42, "Temporarily show the Metamorphosis demon form (suspend morph)", function(enabled)
     ns.SendRawMorphCommand("SET:META:"..(enabled and "1" or "0"))
     if classFileName == "WARLOCK" then
@@ -152,33 +152,23 @@ createCheckboxRow(behaviorCard, "Keep morph in shapeshift forms", "morphInShapes
         if not ns.dbwSuspended and not ns.vehicleSuspended then ns.SendRawMorphCommand("SUSPEND") end
     end
 end)
-createCheckboxRow(behaviorCard, "Show Deathbringer's Will procs", "showDBWProc", -110, "Show the DBW transformation instead of your morph while the proc is active", function(enabled)
-    ns.SendRawMorphCommand("SET:DBW:"..(enabled and "1" or "0"))
-    if not enabled and ns.dbwSuspended then
-        ns.dbwSuspended = false
-        if not ns.morphSuspended and not ns.vehicleSuspended then
-            ns.SendRawMorphCommand("RESUME")
-            if ns.SendFullMorphState then ns.SendFullMorphState() end
-        end
-    end
-end)
 
-local syncCard = createCard(scrollChild, "Multiplayer Synchronization", -356, 80)
+local syncCard = createCard(scrollChild, "Multiplayer Synchronization", -322, 80)
 createCheckboxRow(syncCard, "Activate World Sync", "enableWorldSync", -42, "Enables synchronization of morphs with other players in the world. When disabled, instantly removes all other players' morphs (your morph stays).", function(enabled)
     if ns.P2PToggleWorldSync then
         ns.P2PToggleWorldSync(enabled)
     end
 end)
 
-local interfaceCard = createCard(scrollChild, "Interface", -440, 112)
+local interfaceCard = createCard(scrollChild, "Interface", -406, 112)
 createCheckboxRow(interfaceCard, "Show Minimap Button", "showMinimapButton", -42, "Toggle the Transmorpher button on the minimap.", function(enabled)
     if ns.UpdateMinimapButton then ns.UpdateMinimapButton() end
 end)
-createCheckboxRow(interfaceCard, "Hide Character Info Button", "hidePaperdollButton", -76, "Toggle the Transmorpher button on the Character info frame.", function(enabled)
+createCheckboxRow(interfaceCard, "Hide Character Info Button", "hidePaperdollButton", -76, "Toggle the Transmorpher button on the character info frame.", function(enabled)
     if ns.UpdatePaperdollButtonVisibility then ns.UpdatePaperdollButtonVisibility() end
 end)
 
-local statusCard = createCard(scrollChild, "System Status", -560, 102)
+local statusCard = createCard(scrollChild, "System Status", -526, 102)
 local statusIcon = statusCard:CreateTexture(nil, "ARTWORK")
 statusIcon:SetSize(30, 30)
 statusIcon:SetPoint("TOPLEFT", 14, -50)
@@ -204,7 +194,7 @@ local function UpdateDLLStatus()
     end
 end
 
-local aboutCard = createCard(scrollChild, "About", -702, 160)
+local aboutCard = createCard(scrollChild, "About", -668, 160)
 local infoText = aboutCard:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 infoText:SetPoint("TOPLEFT", 12, -42)
 infoText:SetPoint("BOTTOMRIGHT", -12, 12)

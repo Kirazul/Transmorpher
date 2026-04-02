@@ -1,33 +1,36 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="C:\Users\KIRA\Desktop\stable\StealthMorpher\src\dllmain.cpp">
+    <ClCompile Include="C:\Users\KIRA\Desktop\Transmorpher Main - Copie\StealthMorpher\src\dllmain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\KIRA\Desktop\stable\StealthMorpher\src\Utils.cpp">
+    <ClCompile Include="C:\Users\KIRA\Desktop\Transmorpher Main - Copie\StealthMorpher\src\Utils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\KIRA\Desktop\stable\StealthMorpher\src\Proxy.cpp">
+    <ClCompile Include="C:\Users\KIRA\Desktop\Transmorpher Main - Copie\StealthMorpher\src\Proxy.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\KIRA\Desktop\stable\StealthMorpher\src\Hooks.cpp">
+    <ClCompile Include="C:\Users\KIRA\Desktop\Transmorpher Main - Copie\StealthMorpher\src\Hooks.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\KIRA\Desktop\stable\StealthMorpher\src\Morpher.cpp">
+    <ClCompile Include="C:\Users\KIRA\Desktop\Transmorpher Main - Copie\StealthMorpher\src\Morpher.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\KIRA\Desktop\Transmorpher Main - Copie\StealthMorpher\src\SpellMorph.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="C:\Users\KIRA\Desktop\stable\StealthMorpher\CMakeLists.txt" />
+    <CustomBuild Include="C:\Users\KIRA\Desktop\Transmorpher Main - Copie\StealthMorpher\CMakeLists.txt" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="C:\Users\KIRA\Desktop\stable\StealthMorpher\src\dinput8_exports.def">
+    <None Include="C:\Users\KIRA\Desktop\Transmorpher Main - Copie\StealthMorpher\src\dinput8_exports.def">
       <Filter>Source Files</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Source Files">
-      <UniqueIdentifier>{9D51A551-544B-3C34-87FD-D172CB817D1C}</UniqueIdentifier>
+      <UniqueIdentifier>{CF44E683-C13E-3A53-A71D-183923E7E27A}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

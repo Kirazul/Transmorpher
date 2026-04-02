@@ -8,6 +8,9 @@ local mainFrame = CreateFrame("Frame", addon, UIParent)
 ns.mainFrame = mainFrame
 table.insert(UISpecialFrames, mainFrame:GetName())
 
+-- Shared dropdown frame for EasyMenu
+ns.dropDownFrame = CreateFrame("Frame", "TransmorpherDropDown", mainFrame, "UIDropDownMenuTemplate")
+
 mainFrame:SetWidth(ns.Dimensions.mainWidth)
 mainFrame:SetHeight(ns.Dimensions.mainHeight)
 mainFrame:SetPoint("CENTER")

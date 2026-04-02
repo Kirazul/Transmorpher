@@ -7,6 +7,7 @@
 #include "Morpher.h"
 #include "Utils.h"
 #include "WoWOffsets.h"
+#include "SpellMorph.h"
 
 // ================================================================
 // Timer & Threading
@@ -36,12 +37,30 @@ static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWOR
     if (!g_running) return;
     if (!g_wowHwnd) return;
 
+    // HANDLE CHARACTER SELECTION (GLUE) MONITORING
+    if (IsInGlue()) {
+        uint64_t selectedGuid = GetSelectedCharacterGuid();
+        if (selectedGuid != 0 && selectedGuid != g_lastCharacterGuid) {
+            Log("Character selected in Glue: %llu, pre-loading morph state", selectedGuid);
+            LoadFullState(selectedGuid);
+            g_lastCharacterGuid = selectedGuid;
+            g_forceCharacterStateReload = false; // Already loaded for this GUID
+        }
+        
+        g_luaLoadedSent = false;
+        g_worldStabilityTicks = 0;
+        g_playerGuid = 0;
+        g_wasInWorld = false;
+        return;
+    }
+
     // Only run if we are in World
     if (!IsInWorld()) {
         g_luaLoadedSent = false;
         g_worldStabilityTicks = 0;
         g_playerGuid = 0;
-        g_lastCharacterGuid = 0;
+        // DO NOT CLEAR g_lastCharacterGuid here if it was set in Glue.
+        // We want to preserve it so line 73 knows we already loaded the state.
         g_forceCharacterStateReload = true;
         if (g_wasInWorld) {
             Log("Left world (Teleport/Reload/Logout) - Hard reset (clearing morph targets)");
@@ -49,6 +68,7 @@ static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWOR
             extern DWORD g_playerDescBase;
             g_playerDescBase = 0; // Invalidate descriptor base immediately
             g_wasInWorld = false;
+            g_lastCharacterGuid = 0; // Only clear on EXPLICIT world exit
         }
         return;
     }
@@ -68,21 +88,21 @@ static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWOR
         uint64_t currentGuid = GetPlayerGuid();
         g_playerGuid = currentGuid; // Keep globally visible GUID updated for hooks
 
-        // Only run morph logic if we have a valid player and GUID
+        // Character change detection
         if (currentGuid != 0 && player && player->descriptors) {
-            if (currentGuid != g_lastCharacterGuid || g_forceCharacterStateReload) {
-                // ALWAYS RESET on character change (including first login of session)
-                // This prevents the "last session" global state from leaking into the new character.
-                Log("Character context reload (%llu -> %llu, forced=%u), clearing state",
-                    g_lastCharacterGuid, currentGuid, g_forceCharacterStateReload ? 1 : 0);
-                ResetAllMorphs(true); // forceClearOnly = true
-                PrimeOriginalState(player);
+            bool guidChanged = (currentGuid != g_lastCharacterGuid);
+            if (guidChanged || g_forceCharacterStateReload) {
+                // If GUID changed without pre-loading, or forced reload triggered
+                if (guidChanged) {
+                    Log("Character context change (%llu -> %llu), clearing state",
+                        g_lastCharacterGuid, currentGuid);
+                    ResetAllMorphs(true);
+                    LoadFullState(currentGuid);
+                }
                 
                 g_lastCharacterGuid = currentGuid;
                 g_forceCharacterStateReload = false;
-                
-                LoadFullState(currentGuid);
-                Log("Character isolation active for GUID: %llu (character state loaded)", currentGuid);
+                Log("Character isolation active for GUID: %llu", currentGuid);
             }
         } else {
             if (player && player->descriptors && currentGuid == 0) {
@@ -97,15 +117,19 @@ static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWOR
         if (player && player->descriptors) {
             extern DWORD g_playerDescBase;
             g_playerDescBase = (DWORD)(uintptr_t)player->descriptors;
+        } else {
+            extern DWORD g_playerDescBase;
+            g_playerDescBase = 0;
         }
 
-        // Debounce IsInWorld flicker ONLY for Lua calls (prevents "beeps")
+        // World entry detection
         bool stable = false;
         if (!g_wasInWorld) {
             g_worldStabilityTicks++;
             if (g_worldStabilityTicks >= 1) {
                 Log("Entered world (Login/Teleport/Reload complete)");
-                SoftResetState(player); // Preserve morph targets, re-capture originals
+                PrimeOriginalState(player); // Capture native visual of this character
+                SoftResetState(player);    // Re-apply morph targets
                 g_wasInWorld = true;
                 stable = true;
             }
@@ -223,6 +247,7 @@ static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWOR
                     if (s_nearbyPlayerTicks >= 20) {
                         s_nearbyPlayerTicks = 0;
                         if (g_playerGuid != 0) {
+                            /*
                             char nearby[4096] = {0};
                             GetNearbyPlayers(g_playerGuid, nearby, sizeof(nearby));
                             char escaped[4096] = {0};
@@ -244,6 +269,7 @@ static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWOR
                                     FrameScript_Execute(luaCmd, "Transmorpher", 0);
                                 } __except(1) {}
                             }
+                            */
                         }
                     }
                 }
@@ -336,10 +362,16 @@ static DWORD WINAPI StealthThread(LPVOID lpParam) {
     }
 
     // UpdateDisplayInfo hook is currently disabled in code, just attempt it
-    InstallUpdateDisplayInfoHook();
+    // InstallUpdateDisplayInfoHook();
+    
 
-    g_hookSuccess = mountHookOk;
-    g_initStatus = mountHookOk ? "ACTIVE" : "ACTIVE_NO_HOOKS";
+    bool spellHookOk = InstallSpellVisualHook();
+    if (!spellHookOk) {
+        Log("WARNING: Failed to install spell visual hook!");
+    }
+
+    g_hookSuccess = mountHookOk || spellHookOk;
+    g_initStatus = (mountHookOk || spellHookOk) ? "ACTIVE" : "ACTIVE_NO_HOOKS";
 
     // Install Timer on Main Thread
     if (!SetTimer(g_wowHwnd, MORPH_TIMER_ID, 50, MorphTimerProc)) {
@@ -384,6 +416,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
         Sleep(100); // Let any in-flight hook execution drain
         UninstallMountHook();
         UninstallUpdateDisplayInfoHook();
+
+        UninstallSpellVisualHook();
         UninstallTimeHook();
 
         Sleep(50);

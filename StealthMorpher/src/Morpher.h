@@ -5,7 +5,8 @@
 // Global state variables (declared extern here)
 extern DWORD g_playerDescBase;
 extern uint32_t g_morphMount;
-extern uint32_t g_origMount;
+extern uint32_t g_origDisplay;
+extern float g_origScale;
 extern bool g_suspended;
 extern float g_timeOfDay;
 

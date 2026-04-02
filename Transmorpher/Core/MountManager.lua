@@ -42,7 +42,7 @@ local function ApplyMountMorph(isMounting)
     
     -- 1. Pre-emptive signaling: Always tell the DLL we are entering 'mounted' state
     -- This ensures Layer 2 (Visual Hook) is ready to enforce the model.
-    if IsMounted() or isMounting then
+    if (IsMounted() or isMounting) and not UnitInVehicle("player") then
         ns.SendRawMorphCommand("SET:MOUNTED:1")
     end
 

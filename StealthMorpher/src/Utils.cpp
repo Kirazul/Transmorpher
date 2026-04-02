@@ -1,6 +1,5 @@
 #include "Utils.h"
 #include "WoWOffsets.h"
-#include "Hooks.h"
 #include "Logger.h"
 #include <cstdio>
 #include <vector>
@@ -38,6 +37,14 @@ void* GetLuaState() {
 
 WowObject* GetObjectPtr(uint64_t guid, uint32_t typemask, const char* file, uint32_t line) {
     return _GetObjectPtr(guid, typemask, file, line);
+}
+
+typedef void* (__thiscall* GetRow_fn)(void* db, uint32_t id);
+static auto _GetRow = (GetRow_fn)0x0065C290;
+
+void* GetRow(void* db, uint32_t id) {
+    if (!db) return nullptr;
+    return _GetRow(db, id);
 }
 
 // Memory scanning
@@ -86,11 +93,11 @@ DWORD FindUpdateDisplayInfoHook(DWORD base) {
 
 uint64_t GetPlayerGuid() {
     __try {
-        uint32_t clientConnection = *(uint32_t*)P_CLIENT_CONNECTION;
+        uint32_t clientConnection = *(uint32_t*)(uintptr_t)P_CLIENT_CONNECTION;
         if (clientConnection) {
-            uint32_t objectManager = *(uint32_t*)(clientConnection + 0x2ED0);
+            uint32_t objectManager = *(uint32_t*)(uintptr_t)(clientConnection + P_OBJECT_MGR_OFFSET);
             if (objectManager) {
-                return *(uint64_t*)(objectManager + 0xC0);
+                return *(uint64_t*)(uintptr_t)(objectManager + 0xC0);
             }
         }
     } __except(1) {}
@@ -99,16 +106,22 @@ uint64_t GetPlayerGuid() {
 
 WowObject* GetPlayer() {
     __try {
-        uint32_t clientConnection = *(uint32_t*)P_CLIENT_CONNECTION;
+        uint32_t clientConnection = *(uint32_t*)(uintptr_t)P_CLIENT_CONNECTION;
         if (clientConnection) {
-            uint32_t objectManager = *(uint32_t*)(clientConnection + 0x2ED0);
+            uint32_t objectManager = *(uint32_t*)(uintptr_t)(clientConnection + P_OBJECT_MGR_OFFSET);
             if (objectManager) {
-                uint32_t playerObj = *(uint32_t*)(objectManager + 0x24);
-                if (playerObj) {
-                    WowObject* player = (WowObject*)playerObj;
-                    if (player->descriptors) return player;
+            uint64_t localGuid = *(uint64_t*)(uintptr_t)(objectManager + 0xC0);
+            if (localGuid == 0) return nullptr;
+
+            uint32_t playerObj = *(uint32_t*)(uintptr_t)(objectManager + 0x24);
+            if (playerObj) {
+                WowObject* player = (WowObject*)(uintptr_t)playerObj;
+                if (player->descriptors) {
+                    uint64_t objGuid = *(uint64_t*)player->descriptors;
+                    if (objGuid == localGuid) return player;
                 }
             }
+        }
         }
     } __except(1) {}
 
@@ -220,7 +233,7 @@ bool IsInWorld() {
     __try {
         uint32_t clientConnection = *(uint32_t*)P_CLIENT_CONNECTION;
         if (clientConnection) {
-            uint32_t objectManager = *(uint32_t*)(clientConnection + 0x2ED0);
+            uint32_t objectManager = *(uint32_t*)(clientConnection + P_OBJECT_MGR_OFFSET);
             if (objectManager) {
                 // If ObjectManager exists, we are likely in world
                 // Double check by looking for local player
@@ -230,6 +243,33 @@ bool IsInWorld() {
         }
     } __except(1) {}
     return false;
+}
+
+bool IsInGlue() {
+    __try {
+        uint32_t state = *(uint32_t*)(uintptr_t)P_GAME_STATE;
+        return state == 0;
+    } __except(1) {}
+    return false;
+}
+
+uint64_t GetSelectedCharacterGuid() {
+    __try {
+        if (!IsInGlue()) return 0;
+
+        uint32_t selectionIndex = *(uint32_t*)(uintptr_t)P_CHARACTER_SELECTION;
+        uint32_t charCount = *(uint32_t*)(uintptr_t)P_CHARACTER_COUNT;
+        uint32_t charInfoPtr = *(uint32_t*)(uintptr_t)P_CHARACTER_INFO;
+
+        if (charInfoPtr && selectionIndex < charCount) {
+            // Character list is an array of structures.
+            // GUID is at the start of each structure (offset 0x00).
+            uint8_t* entryPtr = (uint8_t*)(uintptr_t)charInfoPtr + (selectionIndex * CHARACTER_SELECT_ENTRY_SIZE);
+            uint64_t guid = *(uint64_t*)(uintptr_t)entryPtr;
+            return guid;
+        }
+    } __except(1) {}
+    return 0;
 }
 
 void ScanOffsets() {

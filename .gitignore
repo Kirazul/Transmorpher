@@ -1,24 +1,16 @@
-# Build Artifacts
-Transmorpher.rar
-dinput8.dll
-x64/
-Debug/
-Release/
-*.obj
-*.pdb
-*.ilk
-*.exe
+# Build and Binaries
+StealthMorpher/build/
 *.dll
+*.exe
 *.rar
-
-# Visual Studio
-.vs/
+*.vcxproj*
+*.sln
+*.filters
 *.user
-*.suo
-*.sln.docconversations
-*.sln.ghost.pfx
+*.cache
+*.stamp
 
-# OS files
-Thumbs.db
-Desktop.ini
-.DS_Store
+# Transmorpher DB files
+Transmorpher/db/TitlesDB.lua
+
+

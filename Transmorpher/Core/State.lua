@@ -189,6 +189,103 @@ function ns.SetFormMorph(groupID, displayID)
     end
 end
 
+ns.runtimeSpellMorphs = ns.runtimeSpellMorphs or {}
+
+-- Character-specific runtime morphs to prevent cross-character leakage
+local function GetRuntimeMorphsTable()
+    if not ns.runtimeSpellMorphs then
+        ns.runtimeSpellMorphs = {}
+    end
+    return ns.runtimeSpellMorphs
+end
+
+function ns.GetBaseSpellMorph(sourceSpellId)
+    if not TransmorpherCharacterState or not TransmorpherCharacterState.SpellMorphs then return nil end
+    local key = tonumber(sourceSpellId)
+    if not key then return nil end
+    local target = tonumber(TransmorpherCharacterState.SpellMorphs[key])
+    if target and target > 0 then
+        return target
+    end
+    return nil
+end
+
+function ns.GetSpellMorph(sourceSpellId)
+    local key = tonumber(sourceSpellId)
+    if not key then return nil end
+
+    -- Priority 1: Runtime morphs - highest precedence
+    local runtimeTable = GetRuntimeMorphsTable()
+    local runtimeTarget = tonumber(runtimeTable[key])
+    if runtimeTarget and runtimeTarget > 0 then
+        return runtimeTarget
+    end
+
+    -- Priority 2: Base morphs (saved spell morphs)
+    return ns.GetBaseSpellMorph(key)
+end
+
+function ns.SetSpellMorph(sourceSpellId, targetSpellId)
+    if not TransmorpherCharacterState then return end
+    if not TransmorpherCharacterState.SpellMorphs then TransmorpherCharacterState.SpellMorphs = {} end
+    local source = tonumber(sourceSpellId)
+    local target = tonumber(targetSpellId)
+    if not source or source <= 0 then return end
+    if target and target > 0 then
+        TransmorpherCharacterState.SpellMorphs[source] = target
+    else
+        TransmorpherCharacterState.SpellMorphs[source] = nil
+    end
+end
+
+function ns.SetRuntimeSpellMorph(sourceSpellId, targetSpellId)
+    local source = tonumber(sourceSpellId)
+    local target = tonumber(targetSpellId)
+    if not source or source <= 0 then return end
+    if target and target > 0 then
+        ns.runtimeSpellMorphs[source] = target
+    else
+        ns.runtimeSpellMorphs[source] = nil
+    end
+end
+
+function ns.ClearRuntimeSpellMorph(sourceSpellId)
+    local source = tonumber(sourceSpellId)
+    if not source or source <= 0 then return end
+    ns.runtimeSpellMorphs[source] = nil
+end
+
+function ns.ClearAllRuntimeSpellMorphs()
+    wipe(ns.runtimeSpellMorphs)
+end
+
+function ns.GetEffectiveSpellMorphPairs()
+    local combined = {}
+
+    -- First add base morphs (lower priority)
+    if TransmorpherCharacterState and TransmorpherCharacterState.SpellMorphs then
+        for sourceSpellId, targetSpellId in pairs(TransmorpherCharacterState.SpellMorphs) do
+            local source = tonumber(sourceSpellId)
+            local target = tonumber(targetSpellId)
+            if source and source > 0 and target and target > 0 then
+                combined[source] = target
+            end
+        end
+    end
+
+    -- Then override with runtime morphs (higher priority)
+    local runtimeTable = GetRuntimeMorphsTable()
+    for sourceSpellId, targetSpellId in pairs(runtimeTable) do
+        local source = tonumber(sourceSpellId)
+        local target = tonumber(targetSpellId)
+        if source and source > 0 and target and target > 0 then
+            combined[source] = target
+        end
+    end
+
+    return combined
+end
+
 -- ============================================================
 -- EQUIPPED ITEM HELPER
 -- ============================================================
