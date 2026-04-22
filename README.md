@@ -14,8 +14,6 @@ It goes far beyond a basic transmog browser. The addon can preview and morph gea
 | Main commands | `/morph`, `/vm`, `/Transmorpher` |
 | Sync | Optional world sync with other addon users |
 
-![Transmorpher main interface](images/screenshot.png)
-
 ![Transmorpher preview workflow](images/screenshot1.png)
 
 ## Highlights
