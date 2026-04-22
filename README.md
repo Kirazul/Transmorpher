@@ -9,7 +9,7 @@ It goes far beyond a basic transmog browser. The addon can preview and morph gea
 | Item | Value |
 | --- | --- |
 | Version | `2.0.0` |
-| Client | WotLK `3.3.5a` (`Interface: 30300`) |
+| Client | WotLK `3.3.5a`  |
 | Core requirement | `dinput8.dll` or Universal Proxy |
 | Main commands | `/morph`, `/vm`, `/Transmorpher` |
 | Sync | Optional world sync with other addon users |
