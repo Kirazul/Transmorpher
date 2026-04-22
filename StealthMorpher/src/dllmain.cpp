@@ -1,6 +1,12 @@
+#include "ShutdownCheck.h"
+extern "C" volatile bool g_isProcessTerminating = false;
+
 #include <windows.h>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <atomic>
+#include <cmath>
 #include "Logger.h"
 #include "Proxy.h"
 #include "Hooks.h"
@@ -8,6 +14,12 @@
 #include "Utils.h"
 #include "WoWOffsets.h"
 #include "SpellMorph.h"
+#include "D3DHooks.h"
+#include "RenderEnables.h"
+#include "RenderOverrides.h"
+#include "MSDF.h"
+
+bool FontExact_OnAttach();
 
 // ================================================================
 // Timer & Threading
@@ -21,10 +33,185 @@ static uint64_t g_lastCharacterGuid = 0; // Tracked for persistence loading
 static bool g_luaLoadedSent = false;
 static bool g_wasInWorld = false;
 static int  g_worldStabilityTicks = 0;
+static bool g_luaBridgeReady = false;
+static constexpr bool kEnableMSDFRuntime = true;
+static bool g_msdfBootstrapInstalled = false;
+static bool g_msdfBootstrapAttempted = false;
 
 // DLL init status tracking for Lua feedback
 static const char* g_initStatus = "STARTING";
 static bool g_hookSuccess = false;
+
+static D3DCOLOR HexToD3DColor(const char* hex) {
+    if (!hex) return 0xFFFFFFFF;
+
+    char buffer[9] = {};
+    strncpy_s(buffer, sizeof(buffer), hex, _TRUNCATE);
+
+    for (char* p = buffer; *p; ++p) {
+        if (*p >= 'a' && *p <= 'f') {
+            *p = *p - 'a' + 'A';
+        }
+    }
+
+    if (strlen(buffer) == 6) {
+        unsigned int rgb = 0;
+        sscanf_s(buffer, "%06X", &rgb);
+        return 0xFF000000 | rgb;
+    }
+
+    if (strlen(buffer) == 8) {
+        unsigned int argb = 0;
+        sscanf_s(buffer, "%08X", &argb);
+        return (D3DCOLOR)argb;
+    }
+
+    return 0xFFFFFFFF;
+}
+
+
+static bool HandleWorldRenderFlagsCommand(const char* key, const char* value) {
+    if (!key || !value) return false;
+
+    if (_stricmp(key, "renderm2") == 0) {
+        RenderEnables_SetM2(atoi(value) != 0);
+    } else if (_stricmp(key, "renderterrain") == 0) {
+        RenderEnables_SetTerrain(atoi(value) != 0);
+    } else if (_stricmp(key, "terrainculling") == 0) {
+        RenderEnables_SetTerrainCulling(atoi(value) != 0);
+    } else if (_stricmp(key, "m2wmoshadow") == 0) {
+        RenderEnables_SetM2WmoShadow(atoi(value) != 0);
+    } else if (_stricmp(key, "renderwmo") == 0) {
+        RenderEnables_SetWmo(atoi(value) != 0);
+    } else if (_stricmp(key, "wmolighting") == 0) {
+        RenderEnables_SetWmoLighting(atoi(value) != 0);
+    } else if (_stricmp(key, "footprints") == 0) {
+        RenderEnables_SetFootprints(atoi(value) != 0);
+    } else if (_stricmp(key, "wmotextures") == 0) {
+        RenderEnables_SetWmoTextures(atoi(value) != 0);
+    } else if (_stricmp(key, "wmoportals") == 0) {
+        RenderEnables_SetWmoPortals(atoi(value) != 0);
+    } else if (_stricmp(key, "occluders") == 0) {
+        RenderEnables_SetOccluders(atoi(value) != 0);
+    } else if (_stricmp(key, "m2fade") == 0) {
+        RenderEnables_SetM2Fade(atoi(value) != 0);
+    } else if (_stricmp(key, "groundclutter") == 0) {
+        RenderEnables_SetGroundClutter(atoi(value) != 0);
+    } else if (_stricmp(key, "collision") == 0) {
+        RenderEnables_SetCollision(atoi(value) != 0);
+    } else if (_stricmp(key, "liquidsurface") == 0) {
+        RenderEnables_SetLiquidSurface(atoi(value) != 0);
+    } else if (_stricmp(key, "liquidparticles") == 0) {
+        RenderEnables_SetLiquidParticles(atoi(value) != 0);
+    } else if (_stricmp(key, "mountains") == 0) {
+        RenderEnables_SetMountains(atoi(value) != 0);
+    } else if (_stricmp(key, "specularlighting") == 0) {
+        RenderEnables_SetSpecularLighting(atoi(value) != 0);
+    } else if (_stricmp(key, "renderobjectshadow") == 0) {
+        RenderEnables_SetRenderObjectShadow(atoi(value) != 0);
+    } else if (_stricmp(key, "wireframe") == 0) {
+        RenderEnables_SetWireframe(atoi(value) != 0);
+    } else if (_stricmp(key, "normals") == 0) {
+        RenderEnables_SetNormals(atoi(value) != 0);
+    } else {
+        return false;
+    }
+
+    return true;
+}
+
+static bool HandleAnalysisConfigCommand(const char* key, const char* value) {
+    if (!key || !value) return false;
+
+    if (HandleWorldRenderFlagsCommand(key, value)) {
+        return true;
+    }
+
+    if (_stricmp(key, "smoothtex") == 0) RenderOverrides_SetSmoothTextures(atoi(value) != 0);
+    else if (_stricmp(key, "smoothtexbias") == 0) RenderOverrides_SetSmoothTextureBias((float)atof(value));
+    else return false;
+
+    return true;
+}
+
+static bool HandleEnvironmentConfigCommand(const char* key, const char* value) {
+    if (!key || !value) return false;
+
+    if (_stricmp(key, "worldfog") == 0) RenderOverrides_SetWorldFogEnabled(atoi(value) != 0);
+    else if (_stricmp(key, "worldfogcolor") == 0) RenderOverrides_SetWorldFogColor(HexToD3DColor(value));
+    else if (_stricmp(key, "worldfogstart") == 0) RenderOverrides_SetWorldFogStart((float)atof(value));
+    else if (_stricmp(key, "worldfogend") == 0) RenderOverrides_SetWorldFogEnd((float)atof(value));
+    else if (_stricmp(key, "worldfarclipenabled") == 0) RenderOverrides_SetWorldFarClipEnabled(atoi(value) != 0);
+    else if (_stricmp(key, "worldfarclip") == 0) RenderOverrides_SetWorldFarClip((float)atof(value));
+    else return false;
+
+    return true;
+}
+
+static bool ConsumeConfigString(void* luaState, const char* globalName, bool (*handler)(const char*, const char*)) {
+    if (!luaState || !globalName || !handler || !wow_lua_getfield || !wow_lua_tolstring || !wow_lua_settop) {
+        return false;
+    }
+
+    wow_lua_getfield(luaState, LUA_GLOBALSINDEX, globalName);
+    size_t valueLen = 0;
+    const char* value = wow_lua_tolstring(luaState, -1, &valueLen);
+    if (!value || valueLen == 0) {
+        wow_lua_settop(luaState, -2);
+        return false;
+    }
+
+    size_t safeLen = valueLen;
+    if (safeLen > 65535) safeLen = 65535;
+
+    char* payload = (char*)malloc(safeLen + 1);
+    if (!payload) {
+        wow_lua_settop(luaState, -2);
+        return false;
+    }
+
+    memcpy(payload, value, safeLen);
+    payload[safeLen] = '\0';
+
+    wow_lua_settop(luaState, -2);
+    if (FrameScript_Execute) {
+        char clearCommand[128];
+        sprintf_s(clearCommand, sizeof(clearCommand), "%s = ''", globalName);
+        FrameScript_Execute(clearCommand, "Transmorpher", 0);
+    }
+
+    bool handledAny = false;
+    char* nextToken = nullptr;
+    char* token = strtok_s(payload, ";", &nextToken);
+    while (token) {
+        if (token[0] != '\0') {
+            char* eq = strchr(token, '=');
+            if (eq) {
+                *eq = '\0';
+                char* key = token;
+                char* cfgValue = eq + 1;
+
+                while (*key == ' ' || *key == '\t') ++key;
+                while (*cfgValue == ' ' || *cfgValue == '\t') ++cfgValue;
+
+                for (char* end = key + strlen(key); end > key && (end[-1] == ' ' || end[-1] == '\t'); ) {
+                    *(--end) = '\0';
+                }
+                for (char* end = cfgValue + strlen(cfgValue); end > cfgValue && (end[-1] == ' ' || end[-1] == '\t'); ) {
+                    *(--end) = '\0';
+                }
+
+                if (handler(key, cfgValue)) {
+                    handledAny = true;
+                }
+            }
+        }
+        token = strtok_s(nullptr, ";", &nextToken);
+    }
+
+    free(payload);
+    return handledAny;
+}
 
 static bool IsWindowOwnedByCurrentProcess(HWND hwnd) {
     if (!hwnd) return false;
@@ -33,8 +220,26 @@ static bool IsWindowOwnedByCurrentProcess(HWND hwnd) {
     return wndPid == GetCurrentProcessId();
 }
 
+static bool IsLuaBridgeReady(void* luaState) {
+    if (g_luaBridgeReady) return true;
+    if (!luaState || !wow_lua_getfield || !wow_lua_tolstring || !wow_lua_settop) return false;
+
+    wow_lua_getfield(luaState, LUA_GLOBALSINDEX, "TRANSMORPHER_LUA_READY");
+    size_t len = 0;
+    const char* value = wow_lua_tolstring(luaState, -1, &len);
+    const bool ready = value && strcmp(value, "TRUE") == 0;
+    wow_lua_settop(luaState, -2);
+
+    if (ready) {
+        g_luaBridgeReady = true;
+        Log("Lua bridge reported ready by addon");
+    }
+    return ready;
+}
+
 static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime) {
     if (!g_running) return;
+    if (g_isProcessTerminating) return;
     if (!g_wowHwnd) return;
 
     // HANDLE CHARACTER SELECTION (GLUE) MONITORING
@@ -48,6 +253,7 @@ static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWOR
         }
         
         g_luaLoadedSent = false;
+        g_luaBridgeReady = false;
         g_worldStabilityTicks = 0;
         g_playerGuid = 0;
         g_wasInWorld = false;
@@ -57,6 +263,7 @@ static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWOR
     // Only run if we are in World
     if (!IsInWorld()) {
         g_luaLoadedSent = false;
+        g_luaBridgeReady = false;
         g_worldStabilityTicks = 0;
         g_playerGuid = 0;
         // DO NOT CLEAR g_lastCharacterGuid here if it was set in Glue.
@@ -130,6 +337,7 @@ static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWOR
                 Log("Entered world (Login/Teleport/Reload complete)");
                 PrimeOriginalState(player); // Capture native visual of this character
                 SoftResetState(player);    // Re-apply morph targets
+                RenderOverrides_RefreshWorldState();
                 g_wasInWorld = true;
                 stable = true;
             }
@@ -146,10 +354,14 @@ static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWOR
         }
         RemoteMorphGuard();
 
-        // Only process Lua commands and initialization if stable
+        // Only process Lua once the addon explicitly reports that its world-side Lua bridge is ready.
+        if (stable) {
+            D3DHooks_Initialize();
+        }
+
         if (stable) {
             void* L = GetLuaState();
-            if (L) {
+            if (L && IsLuaBridgeReady(L)) {
                 // Check if we need to initialize (Reload detection)
                 bool needInit = false;
                 if (wow_lua_getfield && wow_lua_tolstring && wow_lua_settop) {
@@ -189,7 +401,7 @@ static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWOR
                     const char* val = wow_lua_tolstring(L, -1, &len);
 
                     if (val && len > 0) {
-                        char buffer[4096];
+                        char buffer[32768];
                         strncpy_s(buffer, sizeof(buffer), val, _TRUNCATE);
                         wow_lua_settop(L, -2); // Pop string
 
@@ -241,6 +453,11 @@ static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWOR
                         wow_lua_settop(L, -2); // pop nil/empty
                     }
 
+                    const bool analysisCfgChanged = ConsumeConfigString(L, "TRANSMORPHER_ANALYSIS_CFG", HandleAnalysisConfigCommand);
+                    const bool environmentCfgChanged = ConsumeConfigString(L, "TRANSMORPHER_ENV_CFG", HandleEnvironmentConfigCommand);
+                    (void)analysisCfgChanged;
+                    (void)environmentCfgChanged;
+
                     // Periodically export nearby players (every 1 second = 20 ticks of 50ms)
                     static int s_nearbyPlayerTicks = 0;
                     s_nearbyPlayerTicks++;
@@ -278,6 +495,9 @@ static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWOR
     } __except(EXCEPTION_EXECUTE_HANDLER) {
         Log("Exception in MorphTimerProc");
     }
+
+    RenderOverrides_RefreshWorldState();
+    RenderEnables_Apply();
 }
 
 static DWORD WINAPI StealthThread(LPVOID lpParam) {
@@ -370,6 +590,10 @@ static DWORD WINAPI StealthThread(LPVOID lpParam) {
         Log("WARNING: Failed to install spell visual hook!");
     }
 
+    D3DHooks_Initialize();
+    RenderEnables_Initialize();
+    RenderOverrides_RefreshWorldState();
+
     g_hookSuccess = mountHookOk || spellHookOk;
     g_initStatus = (mountHookOk || spellHookOk) ? "ACTIVE" : "ACTIVE_NO_HOOKS";
 
@@ -395,6 +619,13 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
         g_hThisModule = hModule;
         DisableThreadLibraryCalls(hModule);
         SetupProxy();
+        if (kEnableMSDFRuntime && !g_msdfBootstrapInstalled && !g_msdfBootstrapAttempted) {
+            g_msdfBootstrapAttempted = true;
+            g_msdfBootstrapInstalled = FontExact_OnAttach();
+            Log(g_msdfBootstrapInstalled
+                ? "[MSDF] Reference bootstrap armed during DLL attach"
+                : "[MSDF] Reference bootstrap skipped or failed during DLL attach");
+        }
         HANDLE hThread = CreateThread(nullptr, 0, StealthThread, nullptr, 0, nullptr);
         if (!hThread) {
             Log("CRITICAL: Failed to create stealth thread! Error: %lu", GetLastError());
@@ -406,6 +637,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
     }
     case DLL_PROCESS_DETACH:
         g_running = false;
+        g_isProcessTerminating = true;
         if (g_wowHwnd) {
             KillTimer(g_wowHwnd, MORPH_TIMER_ID);
             g_wowHwnd = nullptr;
@@ -419,6 +651,13 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 
         UninstallSpellVisualHook();
         UninstallTimeHook();
+        D3DHooks_Shutdown();
+        RenderEnables_Shutdown();
+        if (g_msdfBootstrapInstalled || MSDF::IsInitialized()) {
+            MSDF::shutdown();
+            g_msdfBootstrapInstalled = false;
+            g_msdfBootstrapAttempted = false;
+        }
 
         Sleep(50);
 

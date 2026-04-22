@@ -16,6 +16,7 @@ mainFrame:SetHeight(ns.Dimensions.mainHeight)
 mainFrame:SetPoint("CENTER")
 mainFrame:Hide()
 mainFrame:SetMovable(true)
+mainFrame:SetClampedToScreen(true)
 mainFrame:EnableMouse(true)
 mainFrame:RegisterForDrag("LeftButton")
 mainFrame:SetScript("OnDragStart", mainFrame.StartMoving)
@@ -377,6 +378,7 @@ do
     mainFrame.tabs.pets       = tabs[4]
     mainFrame.tabs.combatPets = tabs[5]
     mainFrame.tabs.morph      = tabs[6]
+    mainFrame.tabs.misc       = tabs[7]
     mainFrame.tabs.env        = tabs[7]
     mainFrame.tabs.settings   = tabs[8]
     mainFrame.tabContents     = tabs

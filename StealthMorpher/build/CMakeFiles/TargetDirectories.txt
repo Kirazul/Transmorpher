@@ -1,3 +1,18 @@
-C:/Users/KIRA/Desktop/Transmorpher Main - Copie/StealthMorpher/build/CMakeFiles/dinput8.dir
-C:/Users/KIRA/Desktop/Transmorpher Main - Copie/StealthMorpher/build/CMakeFiles/ALL_BUILD.dir
-C:/Users/KIRA/Desktop/Transmorpher Main - Copie/StealthMorpher/build/CMakeFiles/ZERO_CHECK.dir
+C:/Users/KIRA/Desktop/world of warcraft 3.3.5a hd/Transmorpher/StealthMorpher/build/CMakeFiles/dinput8.dir
+C:/Users/KIRA/Desktop/world of warcraft 3.3.5a hd/Transmorpher/StealthMorpher/build/CMakeFiles/PACKAGE.dir
+C:/Users/KIRA/Desktop/world of warcraft 3.3.5a hd/Transmorpher/StealthMorpher/build/CMakeFiles/INSTALL.dir
+C:/Users/KIRA/Desktop/world of warcraft 3.3.5a hd/Transmorpher/StealthMorpher/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/KIRA/Desktop/world of warcraft 3.3.5a hd/Transmorpher/StealthMorpher/build/CMakeFiles/ZERO_CHECK.dir
+C:/Users/KIRA/Desktop/world of warcraft 3.3.5a hd/Transmorpher/StealthMorpher/build/third_party/Detours/CMakeFiles/Detours.dir
+C:/Users/KIRA/Desktop/world of warcraft 3.3.5a hd/Transmorpher/StealthMorpher/build/third_party/Detours/CMakeFiles/PACKAGE.dir
+C:/Users/KIRA/Desktop/world of warcraft 3.3.5a hd/Transmorpher/StealthMorpher/build/third_party/Detours/CMakeFiles/INSTALL.dir
+C:/Users/KIRA/Desktop/world of warcraft 3.3.5a hd/Transmorpher/StealthMorpher/build/third_party/Detours/CMakeFiles/ALL_BUILD.dir
+C:/Users/KIRA/Desktop/world of warcraft 3.3.5a hd/Transmorpher/StealthMorpher/build/third_party/freetype-2.14.1/CMakeFiles/freetype.dir
+C:/Users/KIRA/Desktop/world of warcraft 3.3.5a hd/Transmorpher/StealthMorpher/build/third_party/freetype-2.14.1/CMakeFiles/PACKAGE.dir
+C:/Users/KIRA/Desktop/world of warcraft 3.3.5a hd/Transmorpher/StealthMorpher/build/third_party/freetype-2.14.1/CMakeFiles/INSTALL.dir
+C:/Users/KIRA/Desktop/world of warcraft 3.3.5a hd/Transmorpher/StealthMorpher/build/third_party/freetype-2.14.1/CMakeFiles/ALL_BUILD.dir
+C:/Users/KIRA/Desktop/world of warcraft 3.3.5a hd/Transmorpher/StealthMorpher/build/third_party/msdfgen/CMakeFiles/msdfgen-core.dir
+C:/Users/KIRA/Desktop/world of warcraft 3.3.5a hd/Transmorpher/StealthMorpher/build/third_party/msdfgen/CMakeFiles/msdfgen-ext.dir
+C:/Users/KIRA/Desktop/world of warcraft 3.3.5a hd/Transmorpher/StealthMorpher/build/third_party/msdfgen/CMakeFiles/PACKAGE.dir
+C:/Users/KIRA/Desktop/world of warcraft 3.3.5a hd/Transmorpher/StealthMorpher/build/third_party/msdfgen/CMakeFiles/INSTALL.dir
+C:/Users/KIRA/Desktop/world of warcraft 3.3.5a hd/Transmorpher/StealthMorpher/build/third_party/msdfgen/CMakeFiles/ALL_BUILD.dir

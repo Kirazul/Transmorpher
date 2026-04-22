@@ -5,7 +5,7 @@ local addon, ns = ...
 -- Centralized color palette, dimensions, slot data, race data
 -- ============================================================
 
-ns.VERSION = "1.2.2"
+ns.VERSION = "2.0.0"
 ns.ADDON_PREFIX = "Transmorpher"
 
 -- ============================================================
@@ -244,6 +244,35 @@ ns.defaultSettings = {
     morphInShapeshift = false,
     worldTime = nil,
     enableWorldSync = true,
+    worldFogEnabled = false,
+    worldFogColor = "#AAAAAA",
+    worldFogStart = 500,
+    worldFogEnd = 2500,
+    worldFarClipEnabled = false,
+    worldFarClip = 2666,
+    worldRenderLiquidSurface = true,
+    worldRenderLiquidParticles = true,
+    worldRenderWireframe = false,
+    worldRenderNormals = false,
+    worldRenderTerrain = true,
+    worldRenderTerrainCulling = true,
+    worldRenderM2 = true,
+    worldRenderM2WmoShadow = true,
+    worldRenderWmo = true,
+    worldRenderWmoLighting = true,
+    worldRenderFootprints = true,
+    worldRenderWmoTextures = true,
+    worldRenderWmoPortals = false,
+    worldRenderOccluders = false,
+    worldRenderM2Fade = true,
+    worldRenderGroundClutter = true,
+    worldRenderCollision = false,
+    worldRenderMountains = true,
+    worldRenderSpecularLighting = true,
+    worldRenderObjectShadow = true,
+    worldRenderSmoothTextures = false,
+    worldRenderSmoothTexturesBias = 1.25,
+    miscHdFontMode = 0,
     talentLoadoutBindings = {},
     maxVisiblePlayers = 0,
     showMinimapButton = true,
@@ -266,7 +295,20 @@ ns.defaultSettings = {
     hideMissileMarker        = false,
     hideSoundMissile         = false,
     hideSoundEvent           = false,
+    protectTierT10           = false,
+    protectTierT9            = false,
+    protectTierT8            = false,
+    protectTierT7            = false,
+    protectTierVOA           = false,
     whiteCardSpells          = {},
+}
+
+ns.optimizationTierOptions = {
+    { key = "T10", settingKey = "protectTierT10", label = "T10", raids = "ICC + RS" },
+    { key = "T9",  settingKey = "protectTierT9",  label = "T9",  raids = "TOC + Onyxia" },
+    { key = "T8",  settingKey = "protectTierT8",  label = "T8",  raids = "Ulduar" },
+    { key = "T7",  settingKey = "protectTierT7",  label = "T7",  raids = "OS + Naxx + EoE" },
+    { key = "VOA", settingKey = "protectTierVOA", label = "VOA", raids = "Vault of Archavon" },
 }
 
 -- ============================================================
@@ -291,6 +333,7 @@ ns.tabConfig = {
     { key = "pets",       label = "Pets",         icon = "Interface\\Icons\\INV_Box_PetCarrier_01" },
     { key = "combatPets", label = "CPets",        icon = "Interface\\Icons\\Ability_Hunter_BeastCall" },
     { key = "morph",      label = "Morph",        icon = "Interface\\Icons\\Spell_Shadow_Charm" },
+    { key = "color",      label = "Color",        icon = "Interface\\Icons\\INV_Misc_Gem_Pearl_06" },
     { key = "env",        label = "Misc",         icon = "Interface\\Icons\\Spell_Nature_EarthBind" },
     { key = "settings",   label = "Settings",     icon = "Interface\\Icons\\INV_Misc_Gear_01" },
 }

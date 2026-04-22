@@ -4,6 +4,7 @@
 #include "Hooks.h"
 #include "Logger.h"
 #include "SpellMorph.h"
+#include "MSDF.h"
 #include <windows.h>
 #include <cstdio>
 #include <cstring>
@@ -106,6 +107,27 @@ static void EnsureStateFolders() {
     char charsDir[MAX_PATH];
     sprintf_s(charsDir, sizeof(charsDir), "%s\\chars", stateDir);
     CreateDirectoryA(charsDir, NULL);
+}
+
+static void GetMSDFStateFilePath(char* out, size_t size) {
+    EnsureStateFolders();
+    sprintf_s(out, size, "%s\\state\\msdf_mode.txt", g_dllDir);
+}
+
+static void SaveMSDFStateSetting(int mode) {
+    char path[MAX_PATH];
+    GetMSDFStateFilePath(path, sizeof(path));
+
+    FILE* file = nullptr;
+    if (fopen_s(&file, path, "wb") != 0 || !file) {
+        Log("[MSDF] Failed to open mode file for write: %s", path);
+        return;
+    }
+
+    const char value = mode != 0 ? '1' : '0';
+    fwrite(&value, 1, 1, file);
+    fclose(file);
+    Log("[MSDF] Persisted mode %d to %s", mode != 0 ? 1 : 0, path);
 }
 
 static void GetLegacyStateFilePath(uint64_t guid, char* out, size_t size) {
@@ -1298,12 +1320,24 @@ bool DoMorph(const char* cmd, WowObject* player) {
         uint32_t id = (uint32_t)atoi(cmd + 22);
         AddPlayerSpellbookSpellId(id);
     }
+    else if (strcmp(cmd, "SPELL_PLAYER_BOOK_COMMIT") == 0) {
+        SpellMorph_SoftResetCache();
+        update = false;
+    }
     else if (strncmp(cmd, "SPELL_WHITE_REMOVE:", 19) == 0) {
         uint32_t id = (uint32_t)atoi(cmd + 19);
         SpellMorph_RemoveWhiteCard(id);
     }
     else if (strncmp(cmd, "SPELL_WHITE_CLEAR", 17) == 0) {
         SpellMorph_ClearWhiteCard();
+    }
+    else if (strncmp(cmd, "SET:PROTECTED_TIER:", 19) == 0) {
+        char tierKey[16] = { 0 };
+        int enabled = 0;
+        if (sscanf_s(cmd + 19, "%15[^:]:%d", tierKey, (unsigned)_countof(tierKey), &enabled) == 2) {
+            SetProtectedTierEnabled(tierKey, enabled > 0);
+        }
+        update = false;
     }
     else if (strcmp(cmd, "SPELL_PROTECTED_DUMP") == 0) {
         PushProtectedSpellResultsToLua();
@@ -1409,6 +1443,15 @@ bool DoMorph(const char* cmd, WowObject* player) {
     }
     else if (strncmp(cmd, "SET:SHAPE:", 10) == 0) {
         g_keepShapeshift = (uint32_t)atoi(cmd + 10);
+    }
+    else if (strncmp(cmd, "MSDF_MODE:", 10) == 0) {
+        int mode = atoi(cmd + 10);
+        if (mode < 0) mode = 0;
+        if (mode > 1) mode = 1;
+        SaveMSDFStateSetting(mode);
+        Log("[MSDF] Saved mode %d for next client start", mode);
+        Log("[MSDF] Runtime mode change queued to %d for next client start", mode);
+        update = false;
     }
     // Multiplayer Sync Bulk Commands
     else if (strncmp(cmd, "PEER_SET:", 9) == 0) {

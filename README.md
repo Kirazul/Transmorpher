@@ -1,125 +1,237 @@
 # Transmorpher
 
-Transmorpher is a **client-side transmogrification system** for **World of Warcraft: Wrath of the Lich King (3.3.5a)** based on morphing.
+Transmorpher is a full client-side appearance and morphing suite for World of Warcraft: Wrath of the Lich King 3.3.5a.
 
-The addon allows players to locally modify their visual appearance without affecting gameplay or server-side data. Visual changes are client-side by default, with an optional multiplayer synchronization mode that shares morph state with other users running Transmorpher.
+It goes far beyond a basic transmog browser. The addon can preview and morph gear, race, creature displays, mounts, companion pets, hunter pets, enchants, titles, spell visuals, shapeshift forms, and selected world presentation settings from one UI, with optional peer-to-peer sync for other addon users.
 
-Transmorpher provides a powerful interface for customizing character appearance, equipment visuals, mounts, pets, and other cosmetic elements.
+## Quick Facts
 
----
+| Item | Value |
+| --- | --- |
+| Version | `2.0.0` |
+| Client | WotLK `3.3.5a` (`Interface: 30300`) |
+| Core requirement | `dinput8.dll` or Universal Proxy |
+| Main commands | `/morph`, `/vm`, `/Transmorpher` |
+| Sync | Optional world sync with other addon users |
 
-# Features
+![Transmorpher main interface](images/screenshot.png)
 
-Transmorpher allows you to morph and customize the following elements:
+![Transmorpher preview workflow](images/screenshot1.png)
 
-- Character models (race and form appearance)
-- Equipped items and weapon visuals
-- Mount models
-- Companion pets
-- Hunter combat pets
-- Weapon enchant visual effects
-- Character titles
-- Time of day (day / night environment control)
+## Highlights
 
-Additional functionality includes:
+- Full equipment transmogrification workflow with slot-based preview and direct apply.
+- Creature and race morphing with saved favorites and direct display ID search.
+- Mount, companion pet, and hunter pet morphing, including quick reset access.
+- Enchant visual morphing for main-hand and off-hand weapons.
+- Account-wide loadouts with talent spec bindings and auto-apply support.
+- Form morph assignments for druid, shaman, warlock, priest, and DBW-style transformations.
+- Direct spell morphing from your spellbook to other spell visuals.
+- Search-heavy UI across items, sets, creatures, pets, titles, spells, and optimization lists.
+- Optional world sync that shares visuals with other Transmorpher users without chat spam.
+- Extra client-side controls for time, fog, far clip, render analysis, optimization, and HD font mode.
 
-- Full **loadout system** to save and apply complete appearance presets
-- **Morph scaling** for characters and pets
-- **Complete 3.3.5 class set database** (441 sets)
-- **Dressing Room UI enhancements**
-- **Equipment visibility control**
-- **Weapon enchant morphing**
-- **Persistent appearance presets**
-- **Optional multiplayer synchronization** (world or group/raid-only)
+## What Transmorpher Covers
 
----
+| Area | What you can do |
+| --- | --- |
+| Gear | Preview items by slot and armor/weapon subclass, apply hidden-slot looks, browse enchants, inspect item IDs, and open Wowhead links. |
+| Sets | Browse item sets by class, preview full outfits, and inspect slot pieces around the dressing room model. |
+| Character Morphs | Switch to race models, apply creature display IDs, resize your character, and save favorite morphs. |
+| Mounts | Search by name, type, or display ID, apply a universal mount morph, hide the mount model, or reset it. |
+| Pets | Search and morph companion pets with quick apply and reset support. |
+| Combat Pets | Morph hunter pets from a curated family list or an all-creatures browser, or enter a display ID directly and scale the pet. |
+| Enchants | Browse and apply main-hand and off-hand enchant visuals from the preview workflow. |
+| Titles | Search and apply character titles from a dedicated picker. |
+| Forms | Assign display IDs to supported form groups such as Bear, Cat, Moonkin, Tree, Travel, Aquatic, Flight, Ghost Wolf, Metamorphosis, Shadowform, and DBW forms. |
+| Spell Visuals | Re-map spell visuals from your spellbook to other spell visuals and keep them persisted in character state. |
+| World Presentation | Adjust time of day, fog, far clip, world render toggles, and selected debugging/analysis options. |
+| Sync | Share your current state with other addon users through optional P2P world sync. |
 
-# Version
+## Tab Guide
 
-Current release: **1.2.0**
+### Main Tabs
 
----
+| Tab | Purpose |
+| --- | --- |
+| `Preview` | Main browsing and preview hub for items, sets, forms, and spells. |
+| `Loadouts` | Save, preview, overwrite, delete, and apply full appearance presets. |
+| `Mounts` | Searchable mount morph browser with set, hide, and reset actions. |
+| `Pets` | Searchable companion pet morph browser. |
+| `CPets` | Hunter pet and creature-display browser with scaling support. |
+| `Morph` | Race morph buttons, custom creature search, size controls, and favorites. |
+| `Misc` | Environment, atmosphere, analysis, titles, HD font, and optimization controls. |
+| `Settings` | Persistence, behavior, sync, interface toggles, and system status. |
 
-# Changelog
+### Preview Sub-Tabs
 
-## 1.2.0
-- **PERFECT PERSISTENCE:** Implemented internal memory hooks (GUID-based) to ensure mount and character morphs survive RELOG and TELEPORT without resetting visuals.
-- **NEW:** Added `CGUnit_C::UpdateDisplayInfo` hook for instant, flicker-free morph enforcement during model rebuilding.
-- **FIX:** Mount morphs now reliably survive zoning into dungeons and raids.
+| Sub-Tab | Purpose |
+| --- | --- |
+| `Items` | Browse item appearances by slot and subclass, search by item name or ID, and preview them on the live model. |
+| `Sets` | Browse class-filtered item sets, inspect each piece, and preview the full set. |
+| `Forms` | Assign creature display IDs to supported shapeshift and transformation groups. |
+| `Spells` | Pick a spell from your spellbook and assign it a different spell visual. |
 
-## 1.1.9
-- **NEW:** Implemented 255-byte message limit bypass for full gear sync (dual Thunderfury + full sets now work)
-- **NEW:** Multipart message system splits large states into chunks and reassembles transparently
-- Removed group/raid-only sync mode (world sync only)
-- Added comprehensive chat filters to prevent ALL sync message leakage (party, raid, guild, whisper, system)
-- Added instant remote player revert when disabling world sync (your morph stays)
-- Improved AFK/DND message filtering
-- Enhanced system message filtering for failed whispers
-- Fixed teleport bug: morphs now properly reset after teleporting
-- Fixed world sync disable: other players now properly revert to original appearance
-- See `255-BYTE-BYPASS.md` for technical details on the multipart message system
+### Misc Sub-Tabs
 
-## 1.1.5
-- Added multiplayer synchronization controls in Settings with world/group modes
-- Improved mount morph backend stability and invalid mount-state recovery
-- Improved enchant preview behavior, including off-hand fallback handling
+| Sub-Tab | Purpose |
+| --- | --- |
+| `Environment` | Set client-side world time. |
+| `Atmosphere` | Control fog and far clip values. |
+| `Analysis` | Toggle render and analysis flags such as terrain, M2, WMO, shadows, wireframe, normals, clutter, and related debug views. |
+| `Titles` | Search and apply titles. |
+| `HD Font` | Queue MSDF font rendering for the next client launch. |
+| `Optimization` | Suppress spell visuals and sounds, protect important spell sets, and manage the protected spell list workflow. |
 
-## 1.1.3
-- **CRITICAL:** Fixed a crash caused by the Time Morph hook overwriting adjacent memory
-- **FIX:** Fixed morph reversion bug where players would revert to native race instead of morphed race after shapeshift/proc (DBW) expiry
-- **NEW:** Added **Universal Proxy** support: DLL can now be renamed to `version.dll` or `dsound.dll` for compatibility
+## Loadouts
 
-## 1.1.2
-- Fixed Title Morph name hiding bug
-- Fixed Sets Tab persistence issues
-- Fixed Misc Tab UI layout bugs
+Loadouts are one of the biggest features in the addon. A loadout can include:
 
-## 1.1.1
+- Equipment appearance and hidden-slot state.
+- Weapon enchant visuals.
+- Mount, companion pet, and combat pet morphs.
+- Character morph and scale.
+- Active title.
 
-- Fixed all Hunter combat pet IDs
-- Fixed morph size not resetting when switching to another morph
-- Fixed Interact with Mouseover / Interact with Target keybind issues while the addon is enabled
-- Fixed Hide Equipment persistence when applying a new item
-- Added a new Sets system containing all 3.3.5 class sets (441 sets)
-- Added morph scale and pet scale to loadout saves
-- Added time control for day/night cycle
-- Added title morphing
+You can also:
 
----
+- Preview a saved loadout before applying it.
+- Overwrite an existing loadout.
+- Delete old loadouts.
+- Bind a loadout to Primary or Secondary talent spec.
+- Auto-apply bound loadouts when you switch specs.
 
-# Installation
+## Controls And Shortcuts
 
-1. Download the latest release:
-   
-   https://github.com/Kirazul/Transmorpher/releases
+| Action | Result |
+| --- | --- |
+| Left-click an equipment slot | Select the slot and jump to matching item previews. |
+| Alt + Left-click an item slot | Apply the currently previewed item morph to that slot. |
+| Right-click an equipment slot | Remove or reset the slot morph. |
+| Shift + Left-click an item slot | Print the item link and item ID to chat. |
+| Ctrl + Left-click an item slot | Open a Wowhead URL dialog for the item. |
+| Left-click an enchant slot | Enter enchant browsing mode in Preview. |
+| Alt + Left-click an enchant slot | Apply the selected enchant visual. |
+| Right-click an enchant slot | Remove the enchant morph. |
+| Left-click a special slot under the model | Open the related tab quickly. |
+| Right-click a special slot | Clear the current mount, pet, combat pet, or character morph. |
+| Left-click minimap button | Toggle the main window. |
+| Right-drag character info button | Reposition the character-frame launcher. |
 
-2. Extract the addon folder into your Interface/AddOns directory.
+## Slash Commands
 
-3. Place `dinput8.dll` (or rename to `version.dll` / `dsound.dll`) next to your Wow.exe.
+| Command | Description |
+| --- | --- |
+| `/morph` | Toggle the Transmorpher window. |
+| `/morph reset` | Reset all active morphs. |
+| `/morph status` | Show DLL and current morph status. |
+| `/morph morph <displayID>` | Morph your character to a creature or race display ID. |
+| `/morph scale <value>` | Set character scale. Use `0` for default. |
+| `/morph mount <displayID>` | Morph your mount. |
+| `/morph pet <displayID>` | Morph your companion pet. |
+| `/morph hpet <displayID>` | Morph your hunter pet. |
+| `/morph enchant <mh|oh> <enchantID>` | Apply an enchant visual. |
+| `/morph title <titleID>` | Apply a title. |
+| `/morph sync` | Broadcast your current state to peers. |
+| `/morph help` | Show command help. |
 
-4. Launch the game and enable **Transmorpher** from the AddOns menu.
+Aliases: `/vm` and `/Transmorpher`
 
----
+## Multiplayer Sync
 
-# Compatibility
+World sync is optional and can be toggled in `Settings`.
 
-- World of Warcraft **Wrath of the Lich King 3.3.5a**
-- Client-side functionality with optional addon-to-addon multiplayer sync
-- Does not modify server data
+When enabled, Transmorpher can share your appearance state with other addon users nearby or connected through supported addon-message routes. The sync system is designed to be practical in real play:
 
-  
-![Screenshot](images/screenshot1.png)
+- It discovers peers automatically.
+- It re-broadcasts after state changes.
+- It filters sync traffic out of visible chat.
+- It handles large state payloads safely.
+- It keeps your own morphs active even if you disable remote world sync.
 
-## Morph System
+This means sync is useful for shared social visuals, RP, events, or coordinated client-side appearance setups without polluting normal chat windows.
 
-![Screenshot](images/Capture%20d'écran%202026-03-04%20132233.png)
+## Settings And Persistence
 
-![Screenshot](images/Capture%20d'écran%202026-03-04%20132756.png)
+The addon supports both account-wide and per-character persistence.
 
-![Screenshot](images/Capture%20d'écran%202026-03-04%20132847.png)
+### Account-level data
 
-![Screenshot](images/Capture%20d'écran%202026-03-04%20132923.png)
+- Morph favorites.
+- Global settings.
+- Saved loadouts.
 
-![Screenshot](images/Capture%20d'écran%202026-03-04%20133238.png)
+### Character-level data
 
-![Screenshot](images/Capture%20d'écran%202026-03-04%20134457.png)
+- Current active morph state.
+- Per-character settings.
+- Mount, pet, and combat pet state.
+- Form and spell morph assignments.
+
+Key settings exposed in the UI include:
+
+- Persist morphs across sessions.
+- Save mount, pet, and combat pet morphs per character.
+- Keep morphs in shapeshift forms.
+- Show Warlock Metamorphosis instead of suppressing it.
+- Enable or disable world sync.
+- Show or hide the minimap button.
+- Show or hide the character info button.
+- Queue HD MSDF font mode for next launch.
+
+## Installation
+
+1. Copy the `Transmorpher` addon folder into your WoW addons directory:
+
+   `World of Warcraft/Interface/AddOns/Transmorpher`
+
+2. Place `dinput8.dll` in your WoW root directory, next to `Wow.exe`.
+
+3. If you use Universal Proxy instead of the bundled DLL loader, configure that instead.
+
+4. Launch the client and use `/morph` to open the UI.
+
+## Important Notes
+
+- The addon UI can load without the DLL, but morphing features will not work until the DLL bridge is available.
+- HD font mode only applies after a full client restart.
+- Some features are class-specific, such as hunter pet morphing and form morph groups.
+- World sync only helps when other nearby players are also running the addon and have sync enabled.
+- Morph suspension behavior during shapeshifts, vehicles, or special forms is configurable in `Settings`.
+
+## Troubleshooting
+
+### "DLL Not Loaded"
+
+- Make sure `dinput8.dll` is in the WoW root folder, not inside `Interface/AddOns`.
+- If you use another loader or proxy, confirm it is configured correctly.
+
+### The UI opens, but morphs do nothing
+
+- This is usually the same DLL issue as above.
+- Check `/morph status` and the `Settings` tab system status card.
+
+### HD font mode did not change
+
+- MSDF font mode is startup-only. Close the client completely and relaunch it.
+
+### I cannot see other players' morphs
+
+- Both players need the addon.
+- Both players need world sync enabled.
+- Give the sync system a moment to discover peers after zoning or logging in.
+
+## Repository Layout
+
+| Path | Purpose |
+| --- | --- |
+| `Transmorpher/` | The addon itself. |
+| `Transmorpher/Core/` | Runtime state, DLL bridge, sync, events, and commands. |
+| `Transmorpher/UI/` | Main frame, slots, buttons, and tab UIs. |
+| `Transmorpher/db/` | Item, mount, pet, title, and preview databases. |
+| `Transmorpher/optimizationdb/` | Protected spell sets used by optimization features. |
+| `images/` | Repository screenshots used in this README. |
+
+## Summary
+
+Transmorpher is not just a transmog browser. It is a unified visual control panel for WotLK 3.3.5a that combines appearance morphing, spell visuals, form overrides, loadouts, sync, and world-side client customization into a single addon workflow.

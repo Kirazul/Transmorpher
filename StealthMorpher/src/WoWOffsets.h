@@ -58,6 +58,9 @@ static const tCGUnit_C_MountModel CGUnit_C_MountModel = (tCGUnit_C_MountModel)0x
 typedef void(__thiscall* tCGUnit_C_DismountModel)(void* pUnit, int a2);
 static const tCGUnit_C_DismountModel CGUnit_C_DismountModel = (tCGUnit_C_DismountModel)0x0073D940;
 
+typedef int(__thiscall* tCGUnit_C_GetCreatureRank)(void* pUnit);
+static const tCGUnit_C_GetCreatureRank CGUnit_C_GetCreatureRank = (tCGUnit_C_GetCreatureRank)0x00718A00;
+
 // Helper functions (inline to avoid linking issues if included multiple times)
 inline uint32_t GetVisibleItemField(int slot) {
     // Visible items start around 0x1D0 (Index 116 = 0x74) ?

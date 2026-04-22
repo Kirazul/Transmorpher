@@ -1,36 +1,69 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="C:\Users\KIRA\Desktop\Transmorpher Main - Copie\StealthMorpher\src\dllmain.cpp">
+    <ClCompile Include="C:\Users\KIRA\Desktop\world of warcraft 3.3.5a hd\Transmorpher\StealthMorpher\src\dllmain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\KIRA\Desktop\Transmorpher Main - Copie\StealthMorpher\src\Utils.cpp">
+    <ClCompile Include="C:\Users\KIRA\Desktop\world of warcraft 3.3.5a hd\Transmorpher\StealthMorpher\src\Utils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\KIRA\Desktop\Transmorpher Main - Copie\StealthMorpher\src\Proxy.cpp">
+    <ClCompile Include="C:\Users\KIRA\Desktop\world of warcraft 3.3.5a hd\Transmorpher\StealthMorpher\src\Proxy.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\KIRA\Desktop\Transmorpher Main - Copie\StealthMorpher\src\Hooks.cpp">
+    <ClCompile Include="C:\Users\KIRA\Desktop\world of warcraft 3.3.5a hd\Transmorpher\StealthMorpher\src\Hooks.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\KIRA\Desktop\Transmorpher Main - Copie\StealthMorpher\src\Morpher.cpp">
+    <ClCompile Include="C:\Users\KIRA\Desktop\world of warcraft 3.3.5a hd\Transmorpher\StealthMorpher\src\Morpher.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\KIRA\Desktop\Transmorpher Main - Copie\StealthMorpher\src\SpellMorph.cpp">
+    <ClCompile Include="C:\Users\KIRA\Desktop\world of warcraft 3.3.5a hd\Transmorpher\StealthMorpher\src\SpellMorph.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\KIRA\Desktop\world of warcraft 3.3.5a hd\Transmorpher\StealthMorpher\src\D3DHooks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\KIRA\Desktop\world of warcraft 3.3.5a hd\Transmorpher\StealthMorpher\src\RenderOverrides.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\KIRA\Desktop\world of warcraft 3.3.5a hd\Transmorpher\StealthMorpher\src\RenderEnables.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\KIRA\Desktop\world of warcraft 3.3.5a hd\Transmorpher\StealthMorpher\src\MSDF.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\KIRA\Desktop\world of warcraft 3.3.5a hd\Transmorpher\StealthMorpher\src\font_exact\D3D.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\KIRA\Desktop\world of warcraft 3.3.5a hd\Transmorpher\StealthMorpher\src\font_exact\Entry.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\KIRA\Desktop\world of warcraft 3.3.5a hd\Transmorpher\StealthMorpher\src\font_exact\Hooks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\KIRA\Desktop\world of warcraft 3.3.5a hd\Transmorpher\StealthMorpher\src\font_exact\MSDFCache.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\KIRA\Desktop\world of warcraft 3.3.5a hd\Transmorpher\StealthMorpher\src\font_exact\MSDFFont.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\KIRA\Desktop\world of warcraft 3.3.5a hd\Transmorpher\StealthMorpher\src\font_exact\MSDFManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\KIRA\Desktop\world of warcraft 3.3.5a hd\Transmorpher\StealthMorpher\src\font_exact\MSDFPregen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="C:\Users\KIRA\Desktop\Transmorpher Main - Copie\StealthMorpher\CMakeLists.txt" />
+    <CustomBuild Include="C:\Users\KIRA\Desktop\world of warcraft 3.3.5a hd\Transmorpher\StealthMorpher\CMakeLists.txt" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="C:\Users\KIRA\Desktop\Transmorpher Main - Copie\StealthMorpher\src\dinput8_exports.def">
+    <None Include="C:\Users\KIRA\Desktop\world of warcraft 3.3.5a hd\Transmorpher\StealthMorpher\src\dinput8_exports.def">
       <Filter>Source Files</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Source Files">
-      <UniqueIdentifier>{CF44E683-C13E-3A53-A71D-183923E7E27A}</UniqueIdentifier>
+      <UniqueIdentifier>{20A860A7-F251-3BC3-BA02-D6622300C8C8}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

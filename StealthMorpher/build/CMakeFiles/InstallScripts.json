@@ -1,7 +1,10 @@
 {
 	"InstallScripts" : 
 	[
-		"C:/Users/KIRA/Desktop/Transmorpher Main - Copie/StealthMorpher/build/cmake_install.cmake"
+		"C:/Users/KIRA/Desktop/world of warcraft 3.3.5a hd/Transmorpher/StealthMorpher/build/cmake_install.cmake",
+		"C:/Users/KIRA/Desktop/world of warcraft 3.3.5a hd/Transmorpher/StealthMorpher/build/third_party/Detours/cmake_install.cmake",
+		"C:/Users/KIRA/Desktop/world of warcraft 3.3.5a hd/Transmorpher/StealthMorpher/build/third_party/freetype-2.14.1/cmake_install.cmake",
+		"C:/Users/KIRA/Desktop/world of warcraft 3.3.5a hd/Transmorpher/StealthMorpher/build/third_party/msdfgen/cmake_install.cmake"
 	],
 	"Parallel" : false
 }

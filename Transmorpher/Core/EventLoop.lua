@@ -39,6 +39,7 @@ local lastDBWActive = false
 local lastKnownMounted = false
 local lastMetaAuraActive = false
 local ScheduleMorphSend
+local QueueReviveRestore
 
 local function CacheVehicleMountState()
     if not TransmorpherCharacterState then
@@ -118,6 +119,38 @@ function ScheduleMorphSend(delay)
     -- Debounce: always reset the timer to prevent duplicate sends
     delayedSendTimer.remaining = delay or 0.05
     delayedSendTimer:Show()
+end
+
+local reviveRestoreTimer = CreateFrame("Frame")
+reviveRestoreTimer:Hide()
+reviveRestoreTimer.remaining = 0
+reviveRestoreTimer.pending = nil
+reviveRestoreTimer:SetScript("OnUpdate", function(self, elapsed)
+    if not self.pending or #self.pending == 0 then
+        self:Hide()
+        return
+    end
+
+    self.remaining = self.remaining - elapsed
+    if self.remaining > 0 then return end
+
+    if not UnitIsDeadOrGhost("player") and ns.SendFullMorphState then
+        ns.SendFullMorphState()
+    end
+
+    table.remove(self.pending, 1)
+    if self.pending[1] then
+        self.remaining = self.pending[1]
+    else
+        self.pending = nil
+        self:Hide()
+    end
+end)
+
+QueueReviveRestore = function()
+    reviveRestoreTimer.pending = {0.05, 0.15}
+    reviveRestoreTimer.remaining = reviveRestoreTimer.pending[1]
+    reviveRestoreTimer:Show()
 end
 
 -- ============================================================
@@ -283,20 +316,25 @@ end
 -- ============================================================
 mainFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "PLAYER_LOGOUT" then
+        ns.isShuttingDown = true
+        TRANSMORPHER_LUA_READY = nil
         TRANSMORPHER_CMD = ""
         TRANSMORPHER_LOG = ""
-        ns.SendRawMorphCommand("RESET:SILENT")
         return
     end
 
     if event == "SPELLS_CHANGED" then
-        if ns.SyncPlayerSpellbookVisibility then
-            ns.SyncPlayerSpellbookVisibility()
+        if ns.RequestPlayerSpellbookVisibilitySync then
+            ns.RequestPlayerSpellbookVisibilitySync(false)
+        elseif ns.SyncPlayerSpellbookVisibility then
+            ns.SyncPlayerSpellbookVisibility(false)
         end
         return
     end
 
     if event == "PLAYER_LOGIN" then
+        ns.isShuttingDown = false
+        TRANSMORPHER_LUA_READY = nil
         TRANSMORPHER_CMD = ""
         TRANSMORPHER_LOG = ""
         -- Initialize DLL settings immediately
@@ -448,6 +486,8 @@ mainFrame:SetScript("OnEvent", function(self, event, ...)
             JoinChannelByName("TransmorpherSync")
         end
     elseif event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
+        TRANSMORPHER_LUA_READY = "TRUE"
+
         -- Don't send RESUME while a native shapeshift form should remain active.
         -- That can wrongly restore the base morph during reload/login transitions.
         if not ns.IsModelChangingForm() and (ns.morphSuspended or ns.dbwSuspended or ns.vehicleSuspended) then
@@ -665,10 +705,10 @@ mainFrame:SetScript("OnEvent", function(self, event, ...)
         ns.isDead = true
         ns.SendRawMorphCommand("SUSPEND") -- Stay frozen while dead/ghost
     elseif event == "PLAYER_ALIVE" or event == "PLAYER_UNGHOST" then
-        if ns.isDead then
+        if ns.isDead or not UnitIsDeadOrGhost("player") then
             ns.isDead = false
             ns.SendRawMorphCommand("RESUME")
-            ScheduleMorphSend(0.2) -- Restore appearance after revival
+            QueueReviveRestore()
             SchedulePetMorphApply(0.3) -- Restore pet appearance after revival
         end
     elseif event == "UNIT_PET" or event == "PET_BAR_UPDATE" then

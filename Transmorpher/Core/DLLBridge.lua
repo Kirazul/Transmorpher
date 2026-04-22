@@ -1,5 +1,29 @@
 local addon, ns = ...
 
+function ns.SyncOptimizationTierProtection()
+    if not ns.IsMorpherReady or not ns.IsMorpherReady() then return end
+
+    local settings = ns.GetSettings()
+    local cmdQueue = {}
+    local tierOptions = ns.optimizationTierOptions or {}
+
+    for _, tier in ipairs(tierOptions) do
+        local enabled = settings[tier.settingKey] and "1" or "0"
+        table.insert(cmdQueue, "SET:PROTECTED_TIER:" .. tier.key .. ":" .. enabled)
+    end
+
+    if #cmdQueue > 0 then
+        ns.SendRawMorphCommand(table.concat(cmdQueue, "|"))
+    end
+end
+
+local function NormalizeHdFontMode(settings)
+    local hdFontMode = tonumber(settings.miscHdFontMode) or 0
+    if hdFontMode <= 0 then hdFontMode = 0 else hdFontMode = 1 end
+    settings.miscHdFontMode = hdFontMode
+    return hdFontMode
+end
+
 -- ============================================================
 -- TRANSMORPHER DLL BRIDGE
 -- Communication with the Transmorpher C++ DLL via global
@@ -8,7 +32,11 @@ local addon, ns = ...
 
 -- Global variables the DLL interacts with
 TRANSMORPHER_CMD = ""             -- DLL reads this for commands
-TRANSMORPHER_DLL_LOADED = nil     -- DLL sets to "TRUE" when loaded
+-- Preserve the DLL-owned loaded flag across reloads/character swaps.
+TRANSMORPHER_DLL_LOADED = TRANSMORPHER_DLL_LOADED
+TRANSMORPHER_LUA_READY = nil      -- Addon sets this when the world-side Lua environment is ready for DLL interaction
+TRANSMORPHER_ANALYSIS_CFG = ""    -- DLL reads this for analysis render config
+TRANSMORPHER_ENV_CFG = ""         -- DLL reads this for misc fog/far clip config
 
 -- ============================================================
 -- COMMAND TRACKING
@@ -70,17 +98,48 @@ local function GetSpellBookSpellId(spellBookIndex)
     return nil
 end
 
+local function AddFlyoutSpellIds(flyoutId, seen, ids)
+    if not flyoutId or flyoutId <= 0 then return end
+    if type(GetFlyoutInfo) ~= "function" or type(GetFlyoutSlotInfo) ~= "function" then return end
+
+    local _, _, numSlots = GetFlyoutInfo(flyoutId)
+    if not numSlots or numSlots <= 0 then return end
+
+    for slot = 1, numSlots do
+        local spellId = GetFlyoutSlotInfo(flyoutId, slot)
+        spellId = tonumber(spellId)
+        if spellId and spellId > 0 and not seen[spellId] then
+            seen[spellId] = true
+            table.insert(ids, spellId)
+        end
+    end
+end
+
 local function GetPlayerSpellbookSpellIds()
     local ids, seen = {}, {}
+    local bookType = BOOKTYPE_SPELL or "spell"
     local numTabs = GetNumSpellTabs() or 0
     for tab = 1, numTabs do
         local _, _, offset, numSpells = GetSpellTabInfo(tab)
         if offset and numSpells then
             for i = 1, numSpells do
-                local spellId = GetSpellBookSpellId(offset + i)
-                if spellId and spellId > 0 and not seen[spellId] then
-                    seen[spellId] = true
-                    table.insert(ids, spellId)
+                local index = offset + i
+                if type(GetSpellBookItemInfo) == "function" then
+                    local spellType, spellId = GetSpellBookItemInfo(index, bookType)
+                    spellId = tonumber(spellId)
+
+                    if spellType == "SPELL" and spellId and spellId > 0 and not seen[spellId] then
+                        seen[spellId] = true
+                        table.insert(ids, spellId)
+                    elseif spellType == "FLYOUT" and spellId and spellId > 0 then
+                        AddFlyoutSpellIds(spellId, seen, ids)
+                    end
+                else
+                    local spellId = GetSpellBookSpellId(index)
+                    if spellId and spellId > 0 and not seen[spellId] then
+                        seen[spellId] = true
+                        table.insert(ids, spellId)
+                    end
                 end
             end
         end
@@ -89,14 +148,168 @@ local function GetPlayerSpellbookSpellIds()
     return ids
 end
 
-function ns.SyncPlayerSpellbookVisibility()
-    if not ns.IsMorpherReady() then return end
-    ns.SendRawMorphCommand("SPELL_PLAYER_BOOK_CLEAR")
-    local spellIds = GetPlayerSpellbookSpellIds()
-    for _, spellId in ipairs(spellIds) do
-        ns.SendRawMorphCommand("SPELL_PLAYER_BOOK_ADD:" .. spellId)
+local spellbookChunkTimer = CreateFrame("Frame")
+spellbookChunkTimer:Hide()
+spellbookChunkTimer.remaining = 0
+
+local spellbookDebounceTimer = CreateFrame("Frame")
+spellbookDebounceTimer:Hide()
+spellbookDebounceTimer.remaining = 0
+
+local pendingSpellbookChunks = nil
+local pendingSpellbookChunkIndex = 1
+local lastSyncedSpellbookSet = nil
+local pendingSpellbookSetAfterFlush = nil
+local spellbookSyncQueued = false
+
+local function BuildSpellbookSet(ids)
+    local set = {}
+    for _, id in ipairs(ids) do
+        set[id] = true
+    end
+    return set
+end
+
+local function BuildSpellbookSyncChunks(commands)
+    local chunks = {}
+    local current = ""
+    local maxLen = 3000
+
+    for _, cmd in ipairs(commands) do
+        if current == "" then
+            current = cmd
+        else
+            local mergedLen = string.len(current) + 1 + string.len(cmd)
+            if mergedLen > maxLen then
+                table.insert(chunks, current)
+                current = cmd
+            else
+                current = current .. "|" .. cmd
+            end
+        end
+    end
+
+    if current ~= "" then
+        table.insert(chunks, current)
+    end
+
+    return chunks
+end
+
+local function QueueSpellbookSync(commands)
+    table.insert(commands, "SPELL_PLAYER_BOOK_COMMIT")
+
+    pendingSpellbookChunks = BuildSpellbookSyncChunks(commands)
+    pendingSpellbookChunkIndex = 1
+
+    if pendingSpellbookChunks[1] then
+        ns.SendRawMorphCommand(pendingSpellbookChunks[1])
+        pendingSpellbookChunkIndex = 2
+    end
+
+    if pendingSpellbookChunkIndex <= #pendingSpellbookChunks then
+        spellbookChunkTimer.remaining = 0.05
+        spellbookChunkTimer:Show()
+    else
+        if pendingSpellbookSetAfterFlush then
+            lastSyncedSpellbookSet = pendingSpellbookSetAfterFlush
+            pendingSpellbookSetAfterFlush = nil
+        end
+        spellbookChunkTimer:Hide()
     end
 end
+
+spellbookChunkTimer:SetScript("OnUpdate", function(self, elapsed)
+    self.remaining = self.remaining - elapsed
+    if self.remaining > 0 then return end
+
+    if not pendingSpellbookChunks or pendingSpellbookChunkIndex > #pendingSpellbookChunks then
+        if pendingSpellbookSetAfterFlush then
+            lastSyncedSpellbookSet = pendingSpellbookSetAfterFlush
+            pendingSpellbookSetAfterFlush = nil
+        end
+        self:Hide()
+        return
+    end
+
+    if TRANSMORPHER_CMD and TRANSMORPHER_CMD ~= "" then
+        self.remaining = 0.05
+        return
+    end
+
+    ns.SendRawMorphCommand(pendingSpellbookChunks[pendingSpellbookChunkIndex])
+    pendingSpellbookChunkIndex = pendingSpellbookChunkIndex + 1
+    self.remaining = 0.05
+end)
+
+function ns.SyncPlayerSpellbookVisibility(forceFull)
+    if not ns.IsMorpherReady() then return end
+
+    local spellIds = GetPlayerSpellbookSpellIds()
+    local currentSet = BuildSpellbookSet(spellIds)
+    local commands = {}
+
+    local requireFull = forceFull or (not lastSyncedSpellbookSet)
+    if not requireFull and lastSyncedSpellbookSet then
+        for spellId, _ in pairs(lastSyncedSpellbookSet) do
+            if not currentSet[spellId] then
+                requireFull = true
+                break
+            end
+        end
+    end
+
+    if requireFull then
+        table.insert(commands, "SPELL_PLAYER_BOOK_CLEAR")
+        for _, spellId in ipairs(spellIds) do
+            table.insert(commands, "SPELL_PLAYER_BOOK_ADD:" .. spellId)
+        end
+    else
+        for _, spellId in ipairs(spellIds) do
+            if not lastSyncedSpellbookSet[spellId] then
+                table.insert(commands, "SPELL_PLAYER_BOOK_ADD:" .. spellId)
+            end
+        end
+        if #commands == 0 then
+            return
+        end
+    end
+
+    QueueSpellbookSync(commands)
+    pendingSpellbookSetAfterFlush = currentSet
+end
+
+function ns.RequestPlayerSpellbookVisibilitySync(immediate)
+    if immediate then
+        spellbookSyncQueued = false
+        spellbookDebounceTimer:Hide()
+        ns.SyncPlayerSpellbookVisibility(false)
+        return
+    end
+
+    spellbookSyncQueued = true
+    spellbookDebounceTimer.remaining = 0.2
+    spellbookDebounceTimer:Show()
+end
+
+function ns.InvalidatePlayerSpellbookVisibilityCache()
+    lastSyncedSpellbookSet = nil
+    pendingSpellbookSetAfterFlush = nil
+    pendingSpellbookChunks = nil
+    pendingSpellbookChunkIndex = 1
+    spellbookChunkTimer:Hide()
+    spellbookSyncQueued = false
+    spellbookDebounceTimer:Hide()
+end
+
+spellbookDebounceTimer:SetScript("OnUpdate", function(self, elapsed)
+    if not spellbookSyncQueued then return end
+    self.remaining = self.remaining - elapsed
+    if self.remaining > 0 then return end
+    self:Hide()
+    spellbookSyncQueued = false
+    ns.SyncPlayerSpellbookVisibility(false)
+end)
 
 local function TrackMorphCommand(cmd)
     local settings = ns.GetSettings()
@@ -294,6 +507,7 @@ end
 -- ============================================================
 
 local function AppendCommand(cmd)
+    if ns.isShuttingDown then return end
     if TRANSMORPHER_CMD == "" then
         TRANSMORPHER_CMD = cmd
     else
@@ -319,6 +533,7 @@ end
 
 -- Send a morph command (tracked in SavedVariables)
 function ns.SendMorphCommand(cmd)
+    if ns.isShuttingDown then return end
     -- If a manual command is sent, clear the active loadout tracking.
     -- This ensures that if the user manually changes a piece of gear,
     -- the loadout system knows it's no longer perfectly matching the saved loadout.
@@ -343,6 +558,7 @@ end
 
 -- Send a raw signal to the DLL (SUSPEND/RESUME) without tracking state
 function ns.SendRawMorphCommand(cmd)
+    if ns.isShuttingDown then return end
     AppendCommand(cmd)
 end
 
@@ -439,7 +655,8 @@ function ns.InitializeDLLSettings()
         end
     end
 
-    -- Send all settings to DLL immediately (DBW is now always 0)
+    -- Send all settings to DLL immediately. MSDF mode is startup-only and is persisted by the DLL for the next launch.
+    ns.SendRawMorphCommand("MSDF_MODE:" .. NormalizeHdFontMode(settings))
     ns.SendRawMorphCommand("SET:DBW:0")
     ns.SendRawMorphCommand("SET:META:" .. (settings.showMetamorphosis and "1" or "0"))
     ns.SendRawMorphCommand("SET:SHAPE:" .. (settings.morphInShapeshift and "1" or "0"))
@@ -468,7 +685,11 @@ function ns.InitializeDLLSettings()
             ns.SendRawMorphCommand("SPELL_WHITE_CARD:" .. id)
         end
     end
-    ns.SyncPlayerSpellbookVisibility()
+    ns.SyncOptimizationTierProtection()
+    ns.SyncPlayerSpellbookVisibility(true)
+
+    if ns.QueueWorldAnalysisSync then ns.QueueWorldAnalysisSync() end
+    if ns.QueueWorldEnvironmentSync then ns.QueueWorldEnvironmentSync() end
     
 
     
@@ -700,10 +921,14 @@ function ns.SendFullMorphState()
             table.insert(cmdQueue, "SPELL_WHITE_CARD:" .. id)
         end
     end
+    local tierOptions = ns.optimizationTierOptions or {}
+    for _, tier in ipairs(tierOptions) do
+        table.insert(cmdQueue, "SET:PROTECTED_TIER:" .. tier.key .. ":" .. (settings[tier.settingKey] and "1" or "0"))
+    end
 
     if #cmdQueue > 0 then
         ns.SendRawMorphCommand(table.concat(cmdQueue, "|"))
     end
 
-    ns.SyncPlayerSpellbookVisibility()
+    ns.SyncPlayerSpellbookVisibility(true)
 end

@@ -99,3 +99,4 @@ bool CreateDllSubdirectory(const char* name);
 void GetSessionLogPath(char* buffer, size_t size);
 void CleanupOldLogs(int maxFilesToKeep);
 void Log(const char* format, ...);
+uint32_t GetObjectTypeMask(WowObject* object);

@@ -29,6 +29,7 @@ bool RemoveProtectedSpellId(uint32_t spellId);
 void ClearProtectedSpellIds();
 bool SaveProtectedSpellIds();
 void ReloadProtectedSpellIds();
+bool SetProtectedTierEnabled(const char* tierKey, bool enabled);
 void AddPlayerSpellbookSpellId(uint32_t spellId);
 void ClearPlayerSpellbookSpellIds();
 extern size_t GetSpellDBCRecordCount();

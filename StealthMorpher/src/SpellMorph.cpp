@@ -10,6 +10,7 @@
 #include <string>
 #include <cmath>
 #include <algorithm>
+#include <cctype>
 
     static bool g_hideAllSpells = false;
     static bool g_showOwnSpells = false;
@@ -32,10 +33,12 @@
     static std::unordered_set<uint32_t> g_whiteCardSpells; // Custom Protection Whitelist
     static SRWLOCK g_whiteCardLock = SRWLOCK_INIT;
     static std::unordered_set<uint32_t> g_playerSpellbookSpells;
+    static std::unordered_set<uint32_t> g_playerSpellbookVisualIds;
     static SRWLOCK g_playerSpellbookLock = SRWLOCK_INIT;
 
 // Use thread_local to track which unit is currently requesting a visual
 static thread_local uint64_t g_currentCasterGUID = 0;
+extern uint64_t g_playerGuid;
 
 namespace {
     struct SpellRec {
@@ -136,10 +139,64 @@ namespace {
     static std::unordered_map<void*, uint32_t> g_sanitizedPtrGeneration; 
     static std::unordered_map<void*, bool> g_lastGranularState; 
     static SpellVisualRec g_nullVisualRec = {};
+    static bool RestoreSpellVisualRow(SpellVisualRec* row);
+
+    static void RestoreAllKnownLiveRows_NoLock() {
+        if (g_liveVisualRows.empty()) return;
+
+        std::unordered_set<SpellVisualRec*> uniqueRows;
+        uniqueRows.reserve(g_liveVisualRows.size());
+
+        for (auto it = g_liveVisualRows.begin(); it != g_liveVisualRows.end(); ++it) {
+            SpellVisualRec* row = it->second;
+            if (!row || row == &g_nullVisualRec) continue;
+            if (reinterpret_cast<uintptr_t>(row) < 0x10000) continue;
+            uniqueRows.insert(row);
+        }
+
+        for (auto it = uniqueRows.begin(); it != uniqueRows.end(); ++it) {
+            RestoreSpellVisualRow(*it);
+        }
+    }
+
+    static bool IsGranularOptimizationEnabled_NoLock() {
+        return (g_hideAllSpells || g_hidePrecast || g_hideCast || g_hideChannel ||
+                g_hideAuraStart || g_hideAuraEnd || g_hideImpact || g_hideImpactCaster ||
+                g_hideTargetImpact || g_hideAreaInstant || g_hideAreaImpact ||
+                g_hideAreaPersistent || g_hideMissile || g_hideMissileMarker ||
+                g_hideSoundMissile || g_hideSoundEvent);
+    }
+
+    static void RestoreAllSanitizedRows_NoLock() {
+        if (g_sanitizedPtrGeneration.empty()) return;
+
+        std::vector<SpellVisualRec*> rows;
+        rows.reserve(g_sanitizedPtrGeneration.size());
+        for (auto it = g_sanitizedPtrGeneration.begin(); it != g_sanitizedPtrGeneration.end(); ++it) {
+            SpellVisualRec* row = reinterpret_cast<SpellVisualRec*>(it->first);
+            if (row && row != &g_nullVisualRec && reinterpret_cast<uintptr_t>(row) > 0x10000) {
+                rows.push_back(row);
+            }
+        }
+
+        for (size_t i = 0; i < rows.size(); ++i) {
+            RestoreSpellVisualRow(rows[i]);
+        }
+    }
 
     static void SoftResetCache() {
         AcquireSRWLockExclusive(&g_spellMorphLock);
         g_morphGeneration++; // New lookups will use new keys, old pointers stay valid in the map
+
+        // Always restore any previously sanitized rows before clearing runtime state.
+        // This guarantees full recovery regardless of current toggle order.
+        RestoreAllSanitizedRows_NoLock();
+
+        // If all granular optimization toggles are now OFF, also force-restore
+        // every known live visual row to avoid any lingering hidden visuals.
+        if (!IsGranularOptimizationEnabled_NoLock()) {
+            RestoreAllKnownLiveRows_NoLock();
+        }
         
         // Clear ALL caches to force re-sync on next access
         // This ensures that when morphs change, we re-apply the correct visual data
@@ -681,10 +738,126 @@ namespace {
         return g_playerSpellbookSpells.count(spellId) != 0;
     }
 
-    static std::unordered_set<uint32_t> g_protectedIds;
+    static bool IsPlayerSpellbookVisual(uint32_t visualId) {
+        if (visualId == 0) return false;
+        SharedLock lock(&g_playerSpellbookLock);
+        return g_playerSpellbookVisualIds.count(visualId) != 0;
+    }
 
-    static const char* GetProtectedSpellsPath() {
-        return "Interface\\AddOns\\Transmorpher\\protected_spells.txt";
+    static bool IsCurrentCasterPlayer() {
+        return g_currentCasterGUID != 0 && g_playerGuid != 0 && g_currentCasterGUID == g_playerGuid;
+    }
+
+    static std::unordered_set<uint32_t> g_protectedIds;
+    static std::unordered_set<uint32_t> g_baseProtectedIds;
+    static std::unordered_map<std::string, std::unordered_set<uint32_t> > g_tierProtectedIds;
+    static std::unordered_map<std::string, bool> g_enabledProtectedTiers;
+
+    struct ProtectedTierDef {
+        const char* key;
+        const char* fileName;
+    };
+
+    static const ProtectedTierDef kProtectedTierDefs[] = {
+        { "T10", "T10.lua" },
+        { "T9",  "T9.lua" },
+        { "T8",  "T8.lua" },
+        { "T7",  "T7.lua" },
+        { "VOA", "VOA.lua" },
+    };
+
+    static void RebuildProtectedVisualIds_NoLock();
+
+    static std::string NormalizeTierKey(const std::string& key) {
+        std::string normalized;
+        normalized.reserve(key.size());
+        for (size_t i = 0; i < key.size(); ++i) {
+            normalized.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(key[i]))));
+        }
+        return normalized;
+    }
+
+    static std::string GetOptimizationDbPath(const char* fileName) {
+        std::string path = "Interface\\AddOns\\Transmorpher\\optimizationdb\\";
+        path += fileName;
+        return path;
+    }
+
+    static std::string GetProtectedSpellsPath() {
+        return GetOptimizationDbPath("protected_spells.lua");
+    }
+
+    static bool LoadSpellIdsFromLuaFile(const std::string& path, std::unordered_set<uint32_t>& outIds) {
+        outIds.clear();
+
+        FILE* f = nullptr;
+        if (fopen_s(&f, path.c_str(), "r") != 0 || !f) {
+            Log("WARNING: optimization spell list not found at %s", path.c_str());
+            return false;
+        }
+
+        char line[4096];
+        while (fgets(line, sizeof(line), f)) {
+            char* comment = strstr(line, "--");
+            if (comment) {
+                *comment = '\0';
+            }
+
+            uint32_t value = 0;
+            bool inNumber = false;
+            for (char* p = line; *p; ++p) {
+                unsigned char ch = static_cast<unsigned char>(*p);
+                if (std::isdigit(ch)) {
+                    value = (value * 10) + static_cast<uint32_t>(ch - '0');
+                    inNumber = true;
+                }
+                else if (inNumber) {
+                    if (value > 0) {
+                        outIds.insert(value);
+                    }
+                    value = 0;
+                    inNumber = false;
+                }
+            }
+
+            if (inNumber && value > 0) {
+                outIds.insert(value);
+            }
+        }
+
+        fclose(f);
+        Log("Loaded %u spell IDs from %s", (unsigned int)outIds.size(), path.c_str());
+        return true;
+    }
+
+    static void RefreshProtectedSpellIds_NoLock() {
+        g_protectedIds = g_baseProtectedIds;
+
+        for (size_t i = 0; i < sizeof(kProtectedTierDefs) / sizeof(kProtectedTierDefs[0]); ++i) {
+            const std::string tierKey = kProtectedTierDefs[i].key;
+            if (g_enabledProtectedTiers[tierKey]) {
+                std::unordered_map<std::string, std::unordered_set<uint32_t> >::const_iterator tierIt = g_tierProtectedIds.find(tierKey);
+                if (tierIt != g_tierProtectedIds.end()) {
+                    g_protectedIds.insert(tierIt->second.begin(), tierIt->second.end());
+                }
+            }
+        }
+
+        g_protectedVisualIds.clear();
+        RebuildProtectedVisualIds_NoLock();
+    }
+
+    static void LoadOptimizationSpellLists_NoLock() {
+        LoadSpellIdsFromLuaFile(GetProtectedSpellsPath(), g_baseProtectedIds);
+
+        g_tierProtectedIds.clear();
+        for (size_t i = 0; i < sizeof(kProtectedTierDefs) / sizeof(kProtectedTierDefs[0]); ++i) {
+            const std::string tierKey = kProtectedTierDefs[i].key;
+            g_enabledProtectedTiers.insert(std::make_pair(tierKey, false));
+            LoadSpellIdsFromLuaFile(GetOptimizationDbPath(kProtectedTierDefs[i].fileName), g_tierProtectedIds[tierKey]);
+        }
+
+        RefreshProtectedSpellIds_NoLock();
     }
 
     static void RebuildProtectedVisualIds_NoLock() {
@@ -729,28 +902,8 @@ namespace {
     }
 
     static void LoadProtectedSpells() {
-        const char* path = GetProtectedSpellsPath();
-        FILE* f = nullptr;
-        if (fopen_s(&f, path, "r") != 0 || !f) {
-            Log("WARNING: protected_spells.txt not found at %s", path);
-            return;
-        }
-
         ExclusiveLock lock(&g_spellMorphLock);
-        g_protectedIds.clear();
-        g_protectedVisualIds.clear();
-        
-        char line[64];
-        uint32_t count = 0;
-        while (fgets(line, sizeof(line), f)) {
-            uint32_t id = static_cast<uint32_t>(std::atoi(line));
-            if (id > 0) {
-                g_protectedIds.insert(id);
-                count++;
-            }
-        }
-        fclose(f);
-        Log("Loaded %u protected spell IDs from database", count);
+        LoadOptimizationSpellLists_NoLock();
     }
 
     static void IdentifyProtectedVisualIds() {
@@ -759,7 +912,7 @@ namespace {
     }
 
     static bool IsCriticalVisual(uint32_t spellId, uint32_t visualId) {
-        // Protection now depends only on protected_spells.txt-resolved spell/visual IDs.
+        // Protection now depends only on the optimizationdb protected spell sets.
         if (g_protectedIds.count(spellId) || g_protectedIds.count(visualId)) return true;
 
         return false;
@@ -792,7 +945,9 @@ namespace {
 
     static bool ShouldProtectVisualRow(uint32_t spellId, uint32_t visualId, SpellVisualRec* row) {
         (void)row;
+        if (g_showOwnSpells && IsCurrentCasterPlayer()) return true;
         if (g_showOwnSpells && IsPlayerSpellbookSpell(spellId)) return true;
+        if (g_showOwnSpells && IsPlayerSpellbookVisual(visualId)) return true;
         if (IsCriticalVisual(spellId, visualId)) return true;
         if (g_protectedVisualIds.count(visualId)) return true;
         return false;
@@ -810,22 +965,23 @@ namespace {
             return;
         }
 
-        if (!granular || isProtected) {
+        // Always restore if protected (includes spellbook spells when showOwnSpells is enabled)
+        if (isProtected) {
             RestoreSpellVisualRow(finalRow);
             return;
         }
 
-        DWORD oldProt;
-        if (VirtualProtect(finalRow, 128, PAGE_READWRITE, &oldProt)) {
-            // ALWAYS sanitize (hide) when granular is enabled
-            // This is the optimization that hides spell visuals
-            SanitizeSpellVisualRec(finalRow, nullptr);
-
-            DWORD dummy;
-            VirtualProtect(finalRow, 128, oldProt, &dummy);
-            g_sanitizedPtrGeneration[finalRow] = g_morphGeneration;
-            g_lastGranularState[finalRow] = granular;
+        // If optimization is disabled, always restore the original visual row.
+        // Without this, rows sanitized while optimization was enabled can remain
+        // hidden until they are later marked protected.
+        if (!granular) {
+            RestoreSpellVisualRow(finalRow);
+            return;
         }
+
+        // Runtime filtering now relies on returning g_nullVisualRec in the hook path.
+        // Avoid mutating live SpellVisual rows here to prevent persistent hidden states.
+        (void)granular;
     }
 
     static void SynchronizeSpellVisualId(uint32_t visualId, bool granular, bool isProtected) {
@@ -1358,8 +1514,8 @@ std::string ExportProtectedSpellIds() {
     std::vector<uint32_t> ids;
     {
         SharedLock lock(&g_spellMorphLock);
-        ids.reserve(g_protectedIds.size());
-        for (std::unordered_set<uint32_t>::const_iterator it = g_protectedIds.begin(); it != g_protectedIds.end(); ++it) {
+        ids.reserve(g_baseProtectedIds.size());
+        for (std::unordered_set<uint32_t>::const_iterator it = g_baseProtectedIds.begin(); it != g_baseProtectedIds.end(); ++it) {
             ids.push_back(*it);
         }
     }
@@ -1379,9 +1535,9 @@ bool AddProtectedSpellId(uint32_t spellId) {
     bool changed = false;
     {
         ExclusiveLock lock(&g_spellMorphLock);
-        std::pair<std::unordered_set<uint32_t>::iterator, bool> res = g_protectedIds.insert(spellId);
+        std::pair<std::unordered_set<uint32_t>::iterator, bool> res = g_baseProtectedIds.insert(spellId);
         if (res.second) {
-            RebuildProtectedVisualIds_NoLock();
+            RefreshProtectedSpellIds_NoLock();
             changed = true;
         }
     }
@@ -1396,9 +1552,9 @@ bool RemoveProtectedSpellId(uint32_t spellId) {
     bool changed = false;
     {
         ExclusiveLock lock(&g_spellMorphLock);
-        size_t removed = g_protectedIds.erase(spellId);
+        size_t removed = g_baseProtectedIds.erase(spellId);
         if (removed > 0) {
-            RebuildProtectedVisualIds_NoLock();
+            RefreshProtectedSpellIds_NoLock();
             changed = true;
         }
     }
@@ -1412,9 +1568,9 @@ void ClearProtectedSpellIds() {
     bool changed = false;
     {
         ExclusiveLock lock(&g_spellMorphLock);
-        changed = !g_protectedIds.empty() || !g_protectedVisualIds.empty();
-        g_protectedIds.clear();
-        g_protectedVisualIds.clear();
+        changed = !g_baseProtectedIds.empty() || !g_protectedIds.empty() || !g_protectedVisualIds.empty();
+        g_baseProtectedIds.clear();
+        RefreshProtectedSpellIds_NoLock();
     }
     if (changed) {
         SoftResetCache();
@@ -1425,8 +1581,8 @@ bool SaveProtectedSpellIds() {
     std::vector<uint32_t> ids;
     {
         SharedLock lock(&g_spellMorphLock);
-        ids.reserve(g_protectedIds.size());
-        for (std::unordered_set<uint32_t>::const_iterator it = g_protectedIds.begin(); it != g_protectedIds.end(); ++it) {
+        ids.reserve(g_baseProtectedIds.size());
+        for (std::unordered_set<uint32_t>::const_iterator it = g_baseProtectedIds.begin(); it != g_baseProtectedIds.end(); ++it) {
             ids.push_back(*it);
         }
     }
@@ -1434,18 +1590,20 @@ bool SaveProtectedSpellIds() {
     std::sort(ids.begin(), ids.end());
 
     FILE* f = nullptr;
-    const char* path = GetProtectedSpellsPath();
-    if (fopen_s(&f, path, "w") != 0 || !f) {
-        Log("ERROR: failed to save protected spells to %s", path);
+    std::string path = GetProtectedSpellsPath();
+    if (fopen_s(&f, path.c_str(), "w") != 0 || !f) {
+        Log("ERROR: failed to save protected base list to %s", path.c_str());
         return false;
     }
 
+    fprintf(f, "return {\n");
     for (size_t i = 0; i < ids.size(); ++i) {
-        fprintf(f, "%u\n", (unsigned int)ids[i]);
+        fprintf(f, "    %u,\n", (unsigned int)ids[i]);
     }
+    fprintf(f, "}\n");
 
     fclose(f);
-    Log("Saved %u protected spell IDs to %s", (unsigned int)ids.size(), path);
+    Log("Saved %u protected base spell IDs to %s", (unsigned int)ids.size(), path.c_str());
     return true;
 }
 
@@ -1455,14 +1613,55 @@ void ReloadProtectedSpellIds() {
     SoftResetCache();
 }
 
+bool SetProtectedTierEnabled(const char* tierKey, bool enabled) {
+    const std::string normalizedKey = NormalizeTierKey(tierKey ? tierKey : "");
+    bool changed = false;
+
+    {
+        ExclusiveLock lock(&g_spellMorphLock);
+        std::unordered_map<std::string, bool>::iterator it = g_enabledProtectedTiers.find(normalizedKey);
+        if (it == g_enabledProtectedTiers.end()) {
+            return false;
+        }
+
+        if (it->second != enabled) {
+            it->second = enabled;
+            RefreshProtectedSpellIds_NoLock();
+            changed = true;
+        }
+    }
+
+    if (changed) {
+        SoftResetCache();
+    }
+
+    return changed;
+}
+
 size_t GetSpellDBCRecordCount() {
     return g_spellIdToVisualIdMap.size();
 }
 
 // --- Visibility Logic (Post-Namespace for SoftResetCache Access) ---
 
-void SetHideAllSpells(bool hide) { g_hideAllSpells = hide; }
-void SetShowOwnSpells(bool show) { g_showOwnSpells = show; }
+void SetHideAllSpells(bool hide) {
+    const bool changed = (g_hideAllSpells != hide);
+    g_hideAllSpells = hide;
+
+    if (changed && !hide) {
+        ExclusiveLock lock(&g_spellMorphLock);
+        RestoreAllKnownLiveRows_NoLock();
+    }
+}
+void SetShowOwnSpells(bool show) {
+    bool changed = (g_showOwnSpells != show);
+    g_showOwnSpells = show;
+
+    if (changed && show) {
+        ExclusiveLock lock(&g_spellMorphLock);
+        RestoreAllSanitizedRows_NoLock();
+    }
+}
 void SetHidePrecast(bool hide) { g_hidePrecast = hide; }
 void SetHideCast(bool hide)    { g_hideCast = hide; }
 void SetHideChannel(bool hide) { g_hideChannel = hide; }
@@ -1501,11 +1700,20 @@ void AddPlayerSpellbookSpellId(uint32_t spellId) {
     if (spellId == 0) return;
     ExclusiveLock lock(&g_playerSpellbookLock);
     g_playerSpellbookSpells.insert(spellId);
+
+    std::vector<uint32_t> visualIds;
+    CollectSpellVisualIds(spellId, nullptr, visualIds);
+    for (size_t i = 0; i < visualIds.size(); ++i) {
+        if (visualIds[i] > 0) {
+            g_playerSpellbookVisualIds.insert(visualIds[i]);
+        }
+    }
 }
 
 void ClearPlayerSpellbookSpellIds() {
     ExclusiveLock lock(&g_playerSpellbookLock);
     g_playerSpellbookSpells.clear();
+    g_playerSpellbookVisualIds.clear();
 }
 
 void SpellMorph_SoftResetCache() {

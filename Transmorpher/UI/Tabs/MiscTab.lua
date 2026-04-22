@@ -1,29 +1,44 @@
 local addon, ns = ...
 
 -- ============================================================
--- MISC TAB — Environment (Time Control) & Titles sub-tabs
+-- MISC TAB — Environment, Atmosphere, Analysis, Titles, HD Font, Optimization
 -- ============================================================
 
 local mainFrame = ns.mainFrame
 local miscTab = mainFrame.tabs.env
 
 local subTabBar = CreateFrame("Frame", nil, miscTab)
-subTabBar:SetSize(220, 30); subTabBar:SetPoint("TOPLEFT", 0, -20)
+subTabBar:SetPoint("TOPLEFT", 8, -18)
+subTabBar:SetPoint("TOPRIGHT", -8, -18)
+subTabBar:SetHeight(30)
 
 local envPanel = CreateFrame("Frame", "$parentEnvPanel", miscTab)
 envPanel:SetPoint("TOPLEFT", 0, -50); envPanel:SetPoint("BOTTOMRIGHT")
 
+local atmospherePanel = CreateFrame("Frame", "$parentAtmospherePanel", miscTab)
+atmospherePanel:SetPoint("TOPLEFT", 0, -50); atmospherePanel:SetPoint("BOTTOMRIGHT"); atmospherePanel:Hide()
+
 local titlesPanel = CreateFrame("Frame", "$parentTitlesPanel", miscTab)
 titlesPanel:SetPoint("TOPLEFT", 0, -50); titlesPanel:SetPoint("BOTTOMRIGHT"); titlesPanel:Hide()
 
-local function CreateMiscSubTabBtn(id, text)
+local hdFontPanel = CreateFrame("Frame", "$parentHdFontPanel", miscTab)
+hdFontPanel:SetPoint("TOPLEFT", 0, -50); hdFontPanel:SetPoint("BOTTOMRIGHT"); hdFontPanel:Hide()
+
+local analysisPanel = CreateFrame("Frame", "$parentAnalysisPanel", miscTab)
+analysisPanel:SetPoint("TOPLEFT", 0, -50); analysisPanel:SetPoint("BOTTOMRIGHT"); analysisPanel:Hide()
+
+local miscSubTabButtons = {}
+local activeMiscSubTab = "env"
+
+local function CreateMiscSubTabBtn(key, text, registerWithLayout)
     local btn = CreateFrame("Button", nil, subTabBar)
-    btn:SetID(id); btn:SetSize(110, 30)
+    btn.key = key
+    btn:SetSize(96, 30)
     local bg = btn:CreateTexture(nil, "BACKGROUND"); bg:SetAllPoints(); bg:SetTexture(1,1,1,0); btn.bg = bg
     local line = btn:CreateTexture(nil, "OVERLAY"); line:SetHeight(2)
-    line:SetPoint("BOTTOMLEFT", 15, 0); line:SetPoint("BOTTOMRIGHT", -15, 0)
+    line:SetPoint("BOTTOMLEFT", 10, 0); line:SetPoint("BOTTOMRIGHT", -10, 0)
     line:SetTexture(1, 0.82, 0); line:Hide(); btn.line = line
-    local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     fs:SetPoint("CENTER"); fs:SetText(text); fs:SetTextColor(0.5,0.5,0.5); btn.fs = fs
     btn.SetActive = function(self, active)
         self.isActive = active
@@ -32,25 +47,68 @@ local function CreateMiscSubTabBtn(id, text)
     end
     btn:SetScript("OnEnter", function(self) if not self.isActive then self.fs:SetTextColor(0.9,0.9,0.9); self.bg:SetTexture(1,1,1,0.03) end end)
     btn:SetScript("OnLeave", function(self) if not self.isActive then self.fs:SetTextColor(0.5,0.5,0.5); self.bg:SetTexture(0,0,0,0) end end)
+    if registerWithLayout ~= false then
+        table.insert(miscSubTabButtons, btn)
+    end
     return btn
 end
 
-local btnEnv = CreateMiscSubTabBtn(1, "Environment"); btnEnv:SetPoint("LEFT", 0, 0); btnEnv:SetWidth(85)
-local btnTitles = CreateMiscSubTabBtn(2, "Titles"); btnTitles:SetPoint("LEFT", btnEnv, "RIGHT", 0, 0); btnTitles:SetWidth(85)
-local btnOpt = CreateMiscSubTabBtn(3, "Optimization"); btnOpt:SetPoint("LEFT", btnTitles, "RIGHT", 0, 0); btnOpt:SetWidth(100)
+local btnEnv = CreateMiscSubTabBtn("env", "Environment")
+local btnAtmosphere = CreateMiscSubTabBtn("atmosphere", "Atmosphere")
+local btnAnalysis = CreateMiscSubTabBtn("analysis", "Analysis")
+local btnTitles = CreateMiscSubTabBtn("titles", "Titles")
+local btnHdFont = CreateMiscSubTabBtn("hd", "HD Font")
+local btnOpt = CreateMiscSubTabBtn("optimization", "Optimization")
 
-local function ShowMiscSubTab(id)
-    envPanel[id == 1 and "Show" or "Hide"](envPanel)
-    titlesPanel[id == 2 and "Show" or "Hide"](titlesPanel)
-    if optimizationPanel then optimizationPanel[id == 3 and "Show" or "Hide"](optimizationPanel) end
-    btnEnv:SetActive(id == 1); btnTitles:SetActive(id == 2); btnOpt:SetActive(id == 3)
+local function LayoutMiscSubTabs()
+    local totalWidth = subTabBar:GetWidth() or 0
+    local count = #miscSubTabButtons
+    if totalWidth <= 0 or count == 0 then return end
+
+    local spacing = 4
+    local buttonWidth = math.floor((totalWidth - spacing * (count - 1)) / count)
+    if buttonWidth < 78 then buttonWidth = 78 end
+
+    for index, button in ipairs(miscSubTabButtons) do
+        button:ClearAllPoints()
+        button:SetWidth(buttonWidth)
+        if index == 1 then
+            button:SetPoint("LEFT", subTabBar, "LEFT", 0, 0)
+        else
+            button:SetPoint("LEFT", miscSubTabButtons[index - 1], "RIGHT", spacing, 0)
+        end
+    end
+end
+
+subTabBar:SetScript("OnSizeChanged", LayoutMiscSubTabs)
+LayoutMiscSubTabs()
+
+local function ShowMiscSubTab(key)
+    activeMiscSubTab = key
+
+    envPanel[key == "env" and "Show" or "Hide"](envPanel)
+    atmospherePanel[key == "atmosphere" and "Show" or "Hide"](atmospherePanel)
+    analysisPanel[key == "analysis" and "Show" or "Hide"](analysisPanel)
+    titlesPanel[key == "titles" and "Show" or "Hide"](titlesPanel)
+    hdFontPanel[key == "hd" and "Show" or "Hide"](hdFontPanel)
+    if optimizationPanel then optimizationPanel[key == "optimization" and "Show" or "Hide"](optimizationPanel) end
+
+    btnEnv:SetActive(key == "env")
+    btnAtmosphere:SetActive(key == "atmosphere")
+    btnAnalysis:SetActive(key == "analysis")
+    btnTitles:SetActive(key == "titles")
+    btnHdFont:SetActive(key == "hd")
+    btnOpt:SetActive(key == "optimization")
     PlaySound("gsTitleOptionOK")
 end
 
-btnEnv:SetScript("OnClick", function() ShowMiscSubTab(1) end)
-btnTitles:SetScript("OnClick", function() ShowMiscSubTab(2) end)
-btnOpt:SetScript("OnClick", function() ShowMiscSubTab(3) end)
-ShowMiscSubTab(1)
+btnEnv:SetScript("OnClick", function() ShowMiscSubTab("env") end)
+btnAtmosphere:SetScript("OnClick", function() ShowMiscSubTab("atmosphere") end)
+btnAnalysis:SetScript("OnClick", function() ShowMiscSubTab("analysis") end)
+btnTitles:SetScript("OnClick", function() ShowMiscSubTab("titles") end)
+btnHdFont:SetScript("OnClick", function() ShowMiscSubTab("hd") end)
+btnOpt:SetScript("OnClick", function() ShowMiscSubTab("optimization") end)
+ShowMiscSubTab(activeMiscSubTab)
 
 -- ============================================================
 -- OPTIMIZATION PANEL
@@ -65,11 +123,11 @@ optimizationPanel = optPanel
 local optSubTabBar = CreateFrame("Frame", nil, optPanel)
 optSubTabBar:SetSize(320, 24); optSubTabBar:SetPoint("TOPLEFT", 4, -4)
 
-local btnOptGeneral = CreateMiscSubTabBtn(1, "General Optimization")
+local btnOptGeneral = CreateMiscSubTabBtn(1, "General Optimization", false)
 btnOptGeneral:SetParent(optSubTabBar); btnOptGeneral:SetPoint("LEFT", 0, 0); btnOptGeneral:SetSize(140, 24)
 btnOptGeneral:SetScript("OnClick", function() ShowOptSubTab(1) end)
 
-local btnOptProtectedFile = CreateMiscSubTabBtn(2, "Protected File")
+local btnOptProtectedFile = CreateMiscSubTabBtn(2, "Protected File", false)
 btnOptProtectedFile:SetParent(optSubTabBar); btnOptProtectedFile:SetPoint("LEFT", btnOptGeneral, "RIGHT", 4, 0); btnOptProtectedFile:SetSize(110, 24)
 btnOptProtectedFile:SetScript("OnClick", function() ShowOptSubTab(2) end)
 
@@ -98,7 +156,7 @@ local optTitle = optCard:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 optTitle:SetPoint("TOPLEFT", 12, -12); optTitle:SetText("|cffF5C842Spell Visibility & Optimization|r")
 
 local optDesc = optCard:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-optDesc:SetPoint("TOPLEFT", optTitle, "BOTTOMLEFT", 0, -4); optDesc:SetText("Toggle specific spell effects globally to maximize performance."); optDesc:SetTextColor(0.7, 0.7, 0.7)
+optDesc:SetPoint("TOPLEFT", optTitle, "BOTTOMLEFT", 0, -4); optDesc:SetText("Toggle spell effects globally to maximize performance. Raid tiers on the right extend the always-active protected base list."); optDesc:SetTextColor(0.7, 0.7, 0.7)
 
 local optWarning = optCard:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 optWarning:SetPoint("TOPLEFT", optDesc, "BOTTOMLEFT", 0, -2)
@@ -128,7 +186,10 @@ local function CreateOptCheckbox(name, label, tooltip, settingKey, cmdPrefix)
         if ns.IsMorpherReady() then
             ns.SendMorphCommand("SET:"..cmdPrefix..":"..(checked and "1" or "0"))
             if settingKey == "showOwnSpells" and ns.SyncPlayerSpellbookVisibility then
-                ns.SyncPlayerSpellbookVisibility()
+                if ns.InvalidatePlayerSpellbookVisibilityCache then
+                    ns.InvalidatePlayerSpellbookVisibilityCache()
+                end
+                ns.SyncPlayerSpellbookVisibility(true)
             end
         end
         PlaySound(checked and "igMainMenuOptionCheckBoxOn" or "igMainMenuOptionCheckBoxOff")
@@ -215,12 +276,22 @@ yPos2 = yPos2 - 18
 CreateOptCheckbox("HideSndM", "Missile Sounds", "Suppresses sounds of traveling projectiles.", "hideSoundMissile", "HIDE_SOUND_MISSILE"):SetPoint("TOPLEFT", col2X, yPos2); yPos2 = yPos2 - rowH
 CreateOptCheckbox("HideSndE", "Impact & Event Sounds", "Suppresses sounds triggered by impacts or events.", "hideSoundEvent", "HIDE_SOUND_EVENT"):SetPoint("TOPLEFT", col2X, yPos2)
 
+local col3X = 460
+local yPos3 = -120
+
+local sub7 = optCard:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+sub7:SetPoint("TOPLEFT", col3X - 4, yPos3); sub7:SetText("|cffA3A3A3Raid Tier Protection|r")
+yPos3 = yPos3 - 18
+
+for _, tierInfo in ipairs(ns.optimizationTierOptions or {}) do
+    local cb = CreateOptCheckbox("Tier" .. tierInfo.key, "|cffF5C842" .. tierInfo.label .. "|r  " .. tierInfo.raids, "Extends the always-active protected base list with this raid tier's spell set.\n\nEnabled: Protected base + this tier\nDisabled: Protected base only", tierInfo.settingKey, "PROTECTED_TIER:" .. tierInfo.key)
+    cb:SetPoint("TOPLEFT", col3X, yPos3)
+    yPos3 = yPos3 - rowH
+end
+
 -- ============================================================
 -- PROTECTION WHITELIST (WHITE CARD)
 -- ============================================================
-optCard:SetScript("OnShow", function()
-    -- Sub-tab specific show logic can go here if needed
-end)
 
 -- ============================================================
 -- OPT PROTECTION (WHITE CARD & SEARCH)
@@ -234,7 +305,7 @@ local protTitle = protCard:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge
 protTitle:SetPoint("TOPLEFT", 14, -14); protTitle:SetText("|cffF5C842Spell Protection (White Card)|r")
 
 local protDesc = protCard:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-protDesc:SetPoint("TOPLEFT", protTitle, "BOTTOMLEFT", 0, -4); protDesc:SetText("Legacy local whitelist view. Runtime protection now depends on protected_spells.txt only."); protDesc:SetTextColor(0.7, 0.7, 0.7)
+protDesc:SetPoint("TOPLEFT", protTitle, "BOTTOMLEFT", 0, -4); protDesc:SetText("Legacy local whitelist view. Runtime protection now depends on the base list plus enabled tier spell sets from optimizationdb."); protDesc:SetTextColor(0.7, 0.7, 0.7)
 
 -- Search Section (Left Column)
 local searchTitle = protCard:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -463,7 +534,7 @@ protCard:SetScript("OnShow", function()
 end)
 
 -- ============================================================
--- PROTECTED FILE MANAGER (`protected_spells.txt`)
+-- PROTECTED FILE MANAGER (`optimizationdb/protected_spells.lua`)
 -- ============================================================
 local protectedFileState = {
     ids = {},
@@ -512,11 +583,12 @@ fileCard:SetBackdrop({bgFile="Interface\\Buttons\\WHITE8x8", edgeFile="Interface
 fileCard:SetBackdropColor(0.05, 0.057, 0.08, 0.95); fileCard:SetBackdropBorderColor(0.56, 0.47, 0.20, 0.78)
 
 local fileTitle = fileCard:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-fileTitle:SetPoint("TOPLEFT", 14, -14); fileTitle:SetText("|cffF5C842Protected Spells File|r")
+fileTitle:SetPoint("TOPLEFT", 14, -14); fileTitle:SetText("|cffF5C842Protected Base List|r")
 
 local fileDesc = fileCard:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 fileDesc:SetPoint("TOPLEFT", fileTitle, "BOTTOMLEFT", 0, -4)
-fileDesc:SetText("Review and edit `protected_spells.txt`, then export the final list back to disk.")
+fileDesc:SetPoint("RIGHT", -14, 0)
+fileDesc:SetText("Manage the always-active base protected list stored in optimizationdb/protected_spells.lua. Tier files extend this list when enabled from General Optimization.")
 fileDesc:SetTextColor(0.7, 0.7, 0.7)
 
 local fileStats = fileCard:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -735,8 +807,8 @@ local function ProtectedFile_RenderList()
     fileListContent:SetHeight(math.max(1, visible * PROTECTED_FILE_ROW_H))
     fileStats:SetText(string.format("%d total spells in file  |  %d matching  |  100 shown per page", total, filtered))
     filePageLabel:SetText(string.format("Page %d/%d", protectedFileState.page, maxPage))
-    btnPrevPage:SetEnabled(protectedFileState.page > 1)
-    btnNextPage:SetEnabled(protectedFileState.page < maxPage)
+    if protectedFileState.page > 1 then btnPrevPage:Enable() else btnPrevPage:Disable() end
+    if protectedFileState.page < maxPage then btnNextPage:Enable() else btnNextPage:Disable() end
 end
 
 local function ProtectedFile_AddSpell(id)
@@ -881,9 +953,9 @@ btnExportFile:SetScript("OnClick", function()
         ns.SendMorphCommand("SPELL_PROTECTED_SAVE")
         SimpleTimer_After(0.1, function()
             if TRANSMORPHER_PROTECTED_SAVE_OK == false then
-                SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Failed to export protected_spells.txt.")
+                SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Failed to export optimizationdb/protected_spells.lua.")
             else
-                SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Exported current protected spell list to protected_spells.txt.")
+                SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Exported current protected base list to optimizationdb/protected_spells.lua.")
             end
         end)
     end
@@ -952,6 +1024,358 @@ btnResetTime:SetScript("OnClick", function()
         slider:SetValue(12.0)
         SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Time reset to server default.")
     end; PlaySound("gsTitleOptionOK")
+end)
+
+local function CreateEnvCard(parent, titleTextValue, descTextValue, yOffset, height)
+    local card = CreateFrame("Frame", nil, parent)
+    card:SetPoint("TOPLEFT", 8, yOffset)
+    card:SetPoint("TOPRIGHT", -8, yOffset)
+    card:SetHeight(height)
+    card:SetBackdrop({bgFile="Interface\\Buttons\\WHITE8x8", edgeFile="Interface\\Buttons\\WHITE8x8", tile=true, tileSize=8, edgeSize=1, insets={left=1,right=1,top=1,bottom=1}})
+    card:SetBackdropColor(0.05, 0.055, 0.07, 0.93)
+    card:SetBackdropBorderColor(0.56, 0.47, 0.20, 0.78)
+
+    local title = card:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("TOPLEFT", 12, -12)
+    title:SetText(titleTextValue)
+
+    local desc = card:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -4)
+    desc:SetPoint("RIGHT", -12, 0)
+    desc:SetJustifyH("LEFT")
+    desc:SetText(descTextValue)
+    desc:SetTextColor(0.7, 0.7, 0.7)
+
+    return card, title, desc
+end
+
+local function MiscHexToRGB(hex)
+    local clean = tostring(hex or "#FFFFFF"):gsub("#", "")
+    local r = tonumber(clean:sub(1, 2), 16) or 255
+    local g = tonumber(clean:sub(3, 4), 16) or 255
+    local b = tonumber(clean:sub(5, 6), 16) or 255
+    return r / 255, g / 255, b / 255
+end
+
+local function MiscColorByte(value)
+    local n = tonumber(value) or 0
+    if n <= 1 then n = n * 255 end
+    n = math.floor(n + 0.5)
+    if n < 0 then n = 0 elseif n > 255 then n = 255 end
+    return n
+end
+
+local atmosphereCard = CreateEnvCard(atmospherePanel, "|cffF5C842Draw Distance|r", "Atmosphere owns far clip and fog controls now, with a cleaner layout after removing the experimental sky-only path.", -8, 188)
+local fogCard = CreateEnvCard(atmospherePanel, "|cffF5C842Fog Override|r", "Apply custom world fog from the Atmosphere tab. These settings sync through the standalone environment config path.", -212, 208)
+local fogSettingsUpdating = false
+
+local function GetFogSettings()
+    return ns.GetWorldEnvironmentSettings()
+end
+
+local function QueueFogSync()
+    if ns.QueueWorldEnvironmentSync then
+        ns.QueueWorldEnvironmentSync()
+    end
+end
+
+local fogEnable = ns.CreateCheckbox(fogCard, "Enable Fog Override", "Override world fog color and start/end distance")
+fogEnable:SetPoint("TOPLEFT", fogCard, "TOPLEFT", 10, -54)
+fogEnable:SetScript("OnClick", function(self)
+    if fogSettingsUpdating then return end
+    ns.SetWorldEnvironmentSetting("worldFogEnabled", self:GetChecked() and true or false)
+    QueueFogSync()
+    PlaySound(self:GetChecked() and "igMainMenuOptionCheckBoxOn" or "igMainMenuOptionCheckBoxOff")
+end)
+
+local fogColorLabel = fogCard:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+fogColorLabel:SetPoint("TOPLEFT", fogEnable, "BOTTOMLEFT", 4, -14)
+fogColorLabel:SetText("Fog Color")
+fogColorLabel:SetTextColor(0.95, 0.88, 0.65)
+
+local fogColorBox = CreateFrame("EditBox", "TransmorpherMiscFogColorBox", fogCard, "InputBoxTemplate")
+fogColorBox:SetSize(84, 20)
+fogColorBox:SetPoint("LEFT", fogColorLabel, "RIGHT", 10, 0)
+fogColorBox:SetAutoFocus(false)
+fogColorBox:SetMaxLetters(7)
+
+local fogColorSwatch = CreateFrame("Button", nil, fogCard)
+fogColorSwatch:SetSize(24, 24)
+fogColorSwatch:SetPoint("LEFT", fogColorBox, "RIGHT", 6, 0)
+fogColorSwatch:SetNormalTexture("Interface\\Buttons\\WHITE8x8")
+
+local function UpdateFogSwatch(hex)
+    local r, g, b = MiscHexToRGB(hex)
+    fogColorSwatch:GetNormalTexture():SetVertexColor(r, g, b)
+end
+
+fogColorBox:SetScript("OnTextChanged", function(self)
+    if fogSettingsUpdating then return end
+    local text = self:GetText()
+    if text:match("^#%x%x%x%x%x%x$") then
+        local color = text:upper()
+        ns.SetWorldEnvironmentSetting("worldFogColor", color)
+        ns.SetWorldEnvironmentSetting("worldFogEnabled", true)
+        UpdateFogSwatch(color)
+        fogEnable:SetChecked(true)
+        QueueFogSync()
+    end
+end)
+
+fogColorSwatch:SetScript("OnClick", function()
+    local settings = GetFogSettings()
+    local r, g, b = MiscHexToRGB(settings.worldFogColor)
+    ColorPickerFrame:SetColorRGB(r, g, b)
+    ColorPickerFrame.hasOpacity = false
+    ColorPickerFrame.func = function()
+        local cr, cg, cb = ColorPickerFrame:GetColorRGB()
+        local hex = string.format("#%02X%02X%02X", MiscColorByte(cr), MiscColorByte(cg), MiscColorByte(cb))
+        ns.SetWorldEnvironmentSetting("worldFogColor", hex)
+        ns.SetWorldEnvironmentSetting("worldFogEnabled", true)
+        fogSettingsUpdating = true
+        fogColorBox:SetText(hex)
+        fogEnable:SetChecked(true)
+        fogSettingsUpdating = false
+        UpdateFogSwatch(hex)
+        QueueFogSync()
+    end
+    ColorPickerFrame.cancelFunc = function() end
+    ColorPickerFrame:Show()
+end)
+
+local fogStartSlider = CreateFrame("Slider", "TransmorpherMiscFogStartSlider", fogCard, "OptionsSliderTemplate")
+fogStartSlider:SetPoint("TOPLEFT", 20, -122)
+fogStartSlider:SetPoint("RIGHT", -24, 0)
+fogStartSlider:SetHeight(18)
+fogStartSlider:SetMinMaxValues(0, 4000)
+fogStartSlider:SetValueStep(10)
+_G[fogStartSlider:GetName() .. "Low"]:SetText("0")
+_G[fogStartSlider:GetName() .. "High"]:SetText("4000")
+_G[fogStartSlider:GetName() .. "Text"]:SetText("Fog Start")
+
+local fogEndSlider = CreateFrame("Slider", "TransmorpherMiscFogEndSlider", fogCard, "OptionsSliderTemplate")
+fogEndSlider:SetPoint("TOPLEFT", fogStartSlider, "BOTTOMLEFT", 0, -38)
+fogEndSlider:SetPoint("RIGHT", -24, 0)
+fogEndSlider:SetHeight(18)
+fogEndSlider:SetMinMaxValues(0, 6000)
+fogEndSlider:SetValueStep(10)
+_G[fogEndSlider:GetName() .. "Low"]:SetText("0")
+_G[fogEndSlider:GetName() .. "High"]:SetText("6000")
+_G[fogEndSlider:GetName() .. "Text"]:SetText("Fog End")
+
+local function SyncFogSliderText(sliderFrame, value)
+    local text = _G[sliderFrame:GetName() .. "Text"]
+    if sliderFrame == fogStartSlider then
+        text:SetText("Fog Start: " .. math.floor((value or 0) + 0.5))
+    else
+        text:SetText("Fog End: " .. math.floor((value or 0) + 0.5))
+    end
+    text:SetTextColor(1, 0.82, 0)
+end
+
+fogStartSlider:SetScript("OnValueChanged", function(self, value)
+    SyncFogSliderText(self, value)
+    if fogSettingsUpdating then return end
+    local fogStart = math.floor((value or 0) / 10 + 0.5) * 10
+    local settings = GetFogSettings()
+    if settings.worldFogEnd <= fogStart then
+        ns.SetWorldEnvironmentSetting("worldFogEnd", fogStart + 10)
+        fogSettingsUpdating = true
+        fogEndSlider:SetValue(fogStart + 10)
+        fogSettingsUpdating = false
+    end
+    ns.SetWorldEnvironmentSetting("worldFogStart", fogStart)
+    ns.SetWorldEnvironmentSetting("worldFogEnabled", true)
+    fogEnable:SetChecked(true)
+    QueueFogSync()
+end)
+
+fogEndSlider:SetScript("OnValueChanged", function(self, value)
+    SyncFogSliderText(self, value)
+    if fogSettingsUpdating then return end
+    local settings = GetFogSettings()
+    local fogEnd = math.floor((value or 0) / 10 + 0.5) * 10
+    if fogEnd <= settings.worldFogStart then
+        fogEnd = settings.worldFogStart + 10
+        fogSettingsUpdating = true
+        self:SetValue(fogEnd)
+        fogSettingsUpdating = false
+    end
+    ns.SetWorldEnvironmentSetting("worldFogEnd", fogEnd)
+    ns.SetWorldEnvironmentSetting("worldFogEnabled", true)
+    fogEnable:SetChecked(true)
+    QueueFogSync()
+end)
+
+local fogResetButton = ns.CreateGoldenButton(nil, fogCard)
+fogResetButton:SetSize(86, 22)
+fogResetButton:SetPoint("TOPRIGHT", fogCard, "TOPRIGHT", -12, -10)
+fogResetButton:SetText("Reset")
+fogResetButton:SetScript("OnClick", function()
+    ns.ResetWorldFogSettings()
+    local settings = GetFogSettings()
+    fogSettingsUpdating = true
+    fogEnable:SetChecked(false)
+    fogColorBox:SetText(settings.worldFogColor)
+    UpdateFogSwatch(settings.worldFogColor)
+    fogStartSlider:SetValue(settings.worldFogStart)
+    fogEndSlider:SetValue(settings.worldFogEnd)
+    fogSettingsUpdating = false
+    QueueFogSync()
+    PlaySound("gsTitleOptionOK")
+end)
+
+local atmosphereSettingsUpdating = false
+
+local farClipEnable = ns.CreateCheckbox(atmosphereCard, "Enable Far Clip Override", "Apply a custom draw distance for the active environment config")
+farClipEnable:SetPoint("TOPLEFT", atmosphereCard, "TOPLEFT", 10, -54)
+farClipEnable:SetScript("OnClick", function(self)
+    if atmosphereSettingsUpdating then return end
+    ns.SetWorldEnvironmentSetting("worldFarClipEnabled", self:GetChecked() and true or false)
+    QueueFogSync()
+    PlaySound(self:GetChecked() and "igMainMenuOptionCheckBoxOn" or "igMainMenuOptionCheckBoxOff")
+end)
+
+local farClipHint = atmosphereCard:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+farClipHint:SetPoint("TOPLEFT", farClipEnable, "BOTTOMLEFT", 4, -8)
+farClipHint:SetPoint("RIGHT", -14, 0)
+farClipHint:SetJustifyH("LEFT")
+farClipHint:SetText("Higher values push the horizon farther out. Adjusting the slider auto-enables the override.")
+
+local farClipSlider = CreateFrame("Slider", "TransmorpherMiscFarClipSlider", atmosphereCard, "OptionsSliderTemplate")
+farClipSlider:SetPoint("TOPLEFT", 20, -126)
+farClipSlider:SetPoint("RIGHT", -24, 0)
+farClipSlider:SetHeight(18)
+farClipSlider:SetMinMaxValues(100, 2666)
+farClipSlider:SetValueStep(1)
+farClipSlider:EnableMouseWheel(true)
+_G[farClipSlider:GetName() .. "Low"]:SetText("100")
+_G[farClipSlider:GetName() .. "High"]:SetText("2666")
+_G[farClipSlider:GetName() .. "Text"]:SetText("Far Clip")
+
+local function SyncFarClipSliderText(value)
+    local text = _G[farClipSlider:GetName() .. "Text"]
+    text:SetText("Far Clip: " .. math.floor((value or 0) + 0.5))
+    text:SetTextColor(1, 0.82, 0)
+end
+
+farClipSlider:SetScript("OnValueChanged", function(self, value)
+    SyncFarClipSliderText(value)
+    if atmosphereSettingsUpdating then return end
+    local farClip = math.floor((value or 0) + 0.5)
+    ns.SetWorldEnvironmentSetting("worldFarClip", farClip)
+    ns.SetWorldEnvironmentSetting("worldFarClipEnabled", true)
+    atmosphereSettingsUpdating = true
+    farClipEnable:SetChecked(true)
+    atmosphereSettingsUpdating = false
+    QueueFogSync()
+end)
+farClipSlider:SetScript("OnMouseWheel", function(self, delta)
+    self:SetValue(self:GetValue() - delta * 25)
+end)
+
+local farClipResetButton = ns.CreateGoldenButton(nil, atmosphereCard)
+farClipResetButton:SetSize(86, 22)
+farClipResetButton:SetPoint("TOPRIGHT", atmosphereCard, "TOPRIGHT", -12, -10)
+farClipResetButton:SetText("Reset")
+farClipResetButton:SetScript("OnClick", function()
+    ns.ResetWorldAtmosphereSettings()
+    local settings = ns.GetWorldEnvironmentSettings()
+    atmosphereSettingsUpdating = true
+    farClipEnable:SetChecked(settings.worldFarClipEnabled and true or false)
+    farClipSlider:SetValue(settings.worldFarClip)
+    atmosphereSettingsUpdating = false
+    PlaySound("gsTitleOptionOK")
+end)
+
+local hdCard = CreateEnvCard(hdFontPanel, "|cffF5C842HD Font Rendering|r", "Enable the retail-style MSDF font runtime for sharper UI text. This setting is only applied on the next client launch.", -8, 168)
+
+local hdModeLabel = hdCard:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+hdModeLabel:SetPoint("TOPLEFT", hdCard, "TOPLEFT", 12, -58)
+hdModeLabel:SetText("Next Launch")
+hdModeLabel:SetTextColor(0.95, 0.88, 0.65)
+
+local hdModeValue = hdCard:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+hdModeValue:SetPoint("LEFT", hdModeLabel, "RIGHT", 8, 0)
+hdModeValue:SetTextColor(1.0, 0.82, 0.20)
+
+local hdToggle = ns.CreateCheckbox(hdCard, "Enable MSDF Font", "Persist the MSDF font runtime mode for the next client launch")
+hdToggle:SetPoint("TOPLEFT", hdModeLabel, "BOTTOMLEFT", 0, -18)
+
+local hdHint = hdCard:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+hdHint:SetPoint("TOPLEFT", hdToggle, "BOTTOMLEFT", 4, -8)
+hdHint:SetPoint("RIGHT", -12, 0)
+hdHint:SetJustifyH("LEFT")
+
+local hdUiUpdating = false
+
+local function GetHdFontEnabled()
+    local settings = ns.GetSettings()
+    local mode = tonumber(settings.miscHdFontMode) or 0
+    if mode <= 0 then mode = 0 else mode = 1 end
+    settings.miscHdFontMode = mode
+    return mode == 1
+end
+
+local function UpdateHdFontModeUI(enabled)
+    hdUiUpdating = true
+    hdToggle:SetChecked(enabled and true or false)
+    hdUiUpdating = false
+    hdModeValue:SetText(enabled and "MSDF" or "Native")
+    hdHint:SetText(enabled and "MSDF font rendering is queued for the next launch. The current session will keep using the existing font renderer." or "Native font rendering is queued for the next launch. The current session will keep using the existing font renderer.")
+end
+
+StaticPopupDialogs["TRANSMORPHER_MSDF_RESTART"] = {
+    text = "MSDF font changes only apply after you close and reopen the client.",
+    button1 = OKAY,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+}
+
+hdToggle:SetScript("OnClick", function(self)
+    if hdUiUpdating then return end
+    local enabled = self:GetChecked() and true or false
+    local settings = ns.GetSettings()
+    settings.miscHdFontMode = enabled and 1 or 0
+    UpdateHdFontModeUI(enabled)
+    if ns.SendRawMorphCommand and ns.IsMorpherReady and ns.IsMorpherReady() then
+        ns.SendRawMorphCommand("MSDF_MODE:" .. (enabled and "1" or "0"))
+    end
+    StaticPopup_Show("TRANSMORPHER_MSDF_RESTART")
+    SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: MSDF font rendering is queued for the next client launch.")
+    PlaySound(enabled and "igMainMenuOptionCheckBoxOn" or "igMainMenuOptionCheckBoxOff")
+end)
+
+atmospherePanel:SetScript("OnShow", function()
+    local settings = ns.GetWorldEnvironmentSettings()
+    atmosphereSettingsUpdating = true
+    farClipEnable:SetChecked(settings.worldFarClipEnabled and true or false)
+    farClipSlider:SetValue(settings.worldFarClip)
+    atmosphereSettingsUpdating = false
+
+    fogSettingsUpdating = true
+    fogEnable:SetChecked(settings.worldFogEnabled and true or false)
+    fogColorBox:SetText(settings.worldFogColor)
+    UpdateFogSwatch(settings.worldFogColor)
+    fogStartSlider:SetValue(settings.worldFogStart)
+    fogEndSlider:SetValue(settings.worldFogEnd)
+    fogSettingsUpdating = false
+end)
+
+hdFontPanel:SetScript("OnShow", function()
+    UpdateHdFontModeUI(GetHdFontEnabled())
+end)
+
+analysisPanel:SetScript("OnShow", function(self)
+    if not self.transmorpherWorldAnalysisBuilt and ns.InitializeWorldAnalysisPanel then
+        ns.InitializeWorldAnalysisPanel(self)
+    end
+
+    if ns.RefreshWorldAnalysisControls then
+        ns.RefreshWorldAnalysisControls()
+    end
 end)
 
 local titleTopBar = CreateFrame("Frame", nil, titlesPanel)
