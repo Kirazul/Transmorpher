@@ -177,48 +177,9 @@ Key settings exposed in the UI include:
 
 3. If you use Universal Proxy instead of the bundled DLL loader, configure that instead.
 
-4. Launch the client and use `/morph` to open the UI.
+4. Launch the client and use `/morph` to open the UI or click on interface button.
 
-## Important Notes
 
-- The addon UI can load without the DLL, but morphing features will not work until the DLL bridge is available.
-- HD font mode only applies after a full client restart.
-- Some features are class-specific, such as hunter pet morphing and form morph groups.
-- World sync only helps when other nearby players are also running the addon and have sync enabled.
-- Morph suspension behavior during shapeshifts, vehicles, or special forms is configurable in `Settings`.
-
-## Troubleshooting
-
-### "DLL Not Loaded"
-
-- Make sure `dinput8.dll` is in the WoW root folder, not inside `Interface/AddOns`.
-- If you use another loader or proxy, confirm it is configured correctly.
-
-### The UI opens, but morphs do nothing
-
-- This is usually the same DLL issue as above.
-- Check `/morph status` and the `Settings` tab system status card.
-
-### HD font mode did not change
-
-- MSDF font mode is startup-only. Close the client completely and relaunch it.
-
-### I cannot see other players' morphs
-
-- Both players need the addon.
-- Both players need world sync enabled.
-- Give the sync system a moment to discover peers after zoning or logging in.
-
-## Repository Layout
-
-| Path | Purpose |
-| --- | --- |
-| `Transmorpher/` | The addon itself. |
-| `Transmorpher/Core/` | Runtime state, DLL bridge, sync, events, and commands. |
-| `Transmorpher/UI/` | Main frame, slots, buttons, and tab UIs. |
-| `Transmorpher/db/` | Item, mount, pet, title, and preview databases. |
-| `Transmorpher/optimizationdb/` | Protected spell sets used by optimization features. |
-| `images/` | Repository screenshots used in this README. |
 
 ## Summary
 
