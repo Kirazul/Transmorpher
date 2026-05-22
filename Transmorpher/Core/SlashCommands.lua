@@ -24,6 +24,8 @@ local function PrintHelp()
         "|cffffff00/morph enchant <mh|oh> <enchantID>|r - Apply enchant visual",
         "|cffffff00/morph title <titleID>|r - Apply title",
         "|cffffff00/morph sync|r - Force broadcast state to peers",
+        "|cffffff00/morph export|r - Export selected loadout string (Ctrl+C)",
+        "|cffffff00/morph import <string>|r - Import a TM1 loadout string",
         "|cffffff00/morph help|r - Show this help",
     }
     for _, line in ipairs(lines) do
@@ -247,6 +249,26 @@ SlashCmdList["Transmorpher"] = function(msg)
             SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: State broadcasted to peers")
         else
             SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: P2P sync not available")
+        end
+
+    elseif cmd == "export" then
+        if ns.ShowExportLoadoutDialog then
+            ns.ShowExportLoadoutDialog()
+        else
+            SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Open the Loadouts tab first.")
+        end
+
+    elseif cmd == "import" then
+        if rest and rest ~= "" then
+            if ns.ImportLoadoutString then
+                ns.ImportLoadoutString(rest, false)
+            else
+                SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Open the Loadouts tab first.")
+            end
+        elseif ns.ShowImportLoadoutDialog then
+            ns.ShowImportLoadoutDialog()
+        else
+            SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Usage: /morph import <TM1 export string>")
         end
 
     else

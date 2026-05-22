@@ -28,6 +28,7 @@ db\TitlesDB.lua
 
 Core\Constants.lua
 Core\Utils.lua
+Core\LoadoutCodec.lua
 Core\DLLBridge.lua
 Core\State.lua
 Core\MountManager.lua

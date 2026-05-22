@@ -111,8 +111,16 @@ loadoutSubLabel:SetJustifyH("LEFT")
 loadoutSubLabel:SetText("Previewing appearance")
 loadoutSubLabel:SetTextColor(0.5, 0.5, 0.5)
 
+local btnImport = ns.CreateGoldenButton("$parentButtonImport", previewFrame)
+btnImport:SetSize(58, 22); btnImport:SetPoint("RIGHT", prevTitleBg, "RIGHT", -10, 0)
+btnImport:SetText("Import")
+
+local btnExport = ns.CreateGoldenButton("$parentButtonExport", previewFrame)
+btnExport:SetSize(58, 22); btnExport:SetPoint("RIGHT", btnImport, "LEFT", -6, 0)
+btnExport:SetText("Export")
+
 local btnUpdate = ns.CreateGoldenButton("$parentButtonUpdate", previewFrame)
-btnUpdate:SetSize(82, 22); btnUpdate:SetPoint("RIGHT", prevTitleBg, "RIGHT", -10, 0)
+btnUpdate:SetSize(82, 22); btnUpdate:SetPoint("RIGHT", btnExport, "LEFT", -6, 0)
 btnUpdate:SetText("Overwrite"); btnUpdate:Disable()
 
 local function CreateSpecButton(parent, label, r, g, b, w)
@@ -411,8 +419,9 @@ local function CaptureCurrentLoadout(...)
     for index, slotName in ipairs(slotOrder) do
         local slot = mainFrame.slots[slotName]
         if slot and slot.isHiddenSlot then
-            loadout.items[index] = -1
             loadout.hiddenSlots[index] = true
+            local morphId = slot.morphedItemId and slot.morphedItemId > 0 and slot.morphedItemId
+            loadout.items[index] = morphId and -morphId or -1
         else
             loadout.items[index] = (slot and slot.morphedItemId and slot.morphedItemId > 0 and slot.morphedItemId) or (slot and slot.itemId) or 0
         end
@@ -474,10 +483,14 @@ local function UpdateLoadoutPreview(loadout)
     local pendingMainHand = nil
     local pendingOffHand = nil
     for index, slotName in ipairs(slotOrder) do
-        local itemId = loadout.items and loadout.items[index]
+        local rawItemId = loadout.items and loadout.items[index]
+        local itemId = rawItemId
+        if rawItemId and rawItemId < 0 then
+            itemId = (rawItemId < -1) and -rawItemId or nil
+        end
         local s = previewSlots[slotName]
         if s then
-            if itemId and itemId ~= 0 then
+            if itemId and itemId > 0 then
                 s.itemId = itemId
                 if slotName == "Main Hand" then
                     pendingMainHand = itemId
@@ -632,8 +645,13 @@ local function ApplyLoadout(loadout, isInitial)
     end
 
     for index, slotName in ipairs(slotOrder) do
-        local itemId = loadout.items and loadout.items[index]
-        local isHidden = loadout.hiddenSlots and loadout.hiddenSlots[index]
+        local rawItemId = loadout.items and loadout.items[index]
+        local isHidden = (loadout.hiddenSlots and loadout.hiddenSlots[index])
+            or (rawItemId and rawItemId < 0)
+        local itemId = rawItemId
+        if rawItemId and rawItemId < 0 then
+            itemId = (rawItemId < -1) and -rawItemId or nil
+        end
         local slot = mainFrame.slots[slotName]
 
         if slot then
@@ -1145,6 +1163,188 @@ btnApplyLoadout:SetScript("OnClick", function()
         if saved then ApplyLoadout(saved) end
     end
 end)
+
+-- ============================================================
+-- Export / Import dialogs
+-- ============================================================
+
+local function GetLoadoutForExport()
+    if type(activeLookId) == "number" and _G["TransmorpherLoadoutsAccount"] then
+        local saved = _G["TransmorpherLoadoutsAccount"][activeLookId]
+        if saved then return saved end
+    end
+    local cur = CaptureCurrentLoadout()
+    cur.name = "Current Appearance"
+    cur.isCurrent = nil
+    return cur
+end
+
+local function ImportLoadoutFromString(encoded, applyAfter)
+    encoded = encoded and encoded:match("^%s*(.-)%s*$") or ""
+    local loadout, err = ns.DeserializeLoadoutString(encoded)
+    if not loadout then
+        SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: |cffff0000Import failed:|r " .. (err or "unknown error"))
+        return false
+    end
+    loadout = ns.NormalizeLoadoutTable(loadout)
+    EnsureLoadoutUid(loadout)
+    table.insert(GetSavedLoadouts(), loadout)
+    activeLookId = #GetSavedLoadouts()
+    BuildListFrames()
+    UpdateLoadoutPreview(loadout)
+    SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Imported loadout '" .. (loadout.name or "Loadout") .. "'.")
+    PlaySound("gsTitleOptionOK")
+    if applyAfter then
+        if ns.IsMorpherReady() then
+            ApplyLoadout(loadout)
+        else
+            SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: |cffff0000DLL not loaded|r — loadout saved but not applied.")
+        end
+    end
+    return true
+end
+
+local function PrintExportStringToChat(encoded)
+    SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r Export string (also shown in dialog — Ctrl+A, Ctrl+C):")
+    local chunkSize = 220
+    for i = 1, #encoded, chunkSize do
+        SELECTED_CHAT_FRAME:AddMessage(encoded:sub(i, i + chunkSize - 1))
+    end
+end
+
+local stringDialog = CreateFrame("Frame", "TransmorpherLoadoutStringDialog", UIParent)
+stringDialog:SetSize(520, 200)
+stringDialog:SetPoint("CENTER")
+stringDialog:SetFrameStrata("FULLSCREEN_DIALOG")
+stringDialog:SetToplevel(true)
+stringDialog:SetBackdrop({
+    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    tile = true, tileSize = 32, edgeSize = 32,
+    insets = { left = 11, right = 12, top = 12, bottom = 11 },
+})
+stringDialog:Hide()
+stringDialog:EnableMouse(true)
+stringDialog:SetMovable(true)
+stringDialog:RegisterForDrag("LeftButton")
+stringDialog:SetScript("OnDragStart", stringDialog.StartMoving)
+stringDialog:SetScript("OnDragStop", stringDialog.StopMovingOrSizing)
+
+local stringDialogTitle = stringDialog:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+stringDialogTitle:SetPoint("TOP", 0, -16)
+
+local stringDialogHint = stringDialog:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+stringDialogHint:SetPoint("TOP", 0, -36)
+stringDialogHint:SetWidth(480)
+stringDialogHint:SetJustifyH("CENTER")
+
+local stringDialogScroll = CreateFrame("ScrollFrame", "$parentScroll", stringDialog, "UIPanelScrollFrameTemplate")
+stringDialogScroll:SetPoint("TOPLEFT", 24, -56)
+stringDialogScroll:SetPoint("BOTTOMRIGHT", -44, 48)
+
+local STRING_EDIT_WIDTH = 430
+local STRING_EDIT_HEIGHT = 90
+
+local stringDialogEdit = CreateFrame("EditBox", "$parentEdit", stringDialogScroll)
+stringDialogEdit:SetMultiLine(true)
+stringDialogEdit:SetAutoFocus(false)
+stringDialogEdit:SetFontObject("ChatFontNormal")
+stringDialogEdit:SetWidth(STRING_EDIT_WIDTH)
+stringDialogEdit:SetHeight(STRING_EDIT_HEIGHT)
+stringDialogEdit:SetMaxLetters(4096)
+if stringDialogEdit.SetTextInsets then
+    stringDialogEdit:SetTextInsets(4, 4, 4, 4)
+end
+stringDialogEdit:SetScript("OnEscapePressed", function(self)
+    self:ClearFocus()
+    stringDialog:Hide()
+end)
+stringDialogScroll:SetScrollChild(stringDialogEdit)
+
+local stringDialogMode = "export"
+
+local btnStringClose = CreateFrame("Button", nil, stringDialog, "UIPanelButtonTemplate")
+btnStringClose:SetSize(90, 22)
+btnStringClose:SetPoint("BOTTOMRIGHT", -16, 16)
+btnStringClose:SetText(CLOSE)
+btnStringClose:SetScript("OnClick", function() stringDialog:Hide() end)
+
+local btnStringImport = CreateFrame("Button", nil, stringDialog, "UIPanelButtonTemplate")
+btnStringImport:SetSize(80, 22)
+btnStringImport:SetPoint("BOTTOMLEFT", 16, 16)
+btnStringImport:SetText("Import")
+btnStringImport:Hide()
+
+local btnStringImportApply = CreateFrame("Button", nil, stringDialog, "UIPanelButtonTemplate")
+btnStringImportApply:SetSize(110, 22)
+btnStringImportApply:SetPoint("LEFT", btnStringImport, "RIGHT", 8, 0)
+btnStringImportApply:SetText("Import & Apply")
+btnStringImportApply:Hide()
+
+local function ShowStringDialog(mode, text)
+    stringDialogMode = mode
+    stringDialogEdit:SetHeight(STRING_EDIT_HEIGHT)
+    stringDialogEdit:SetWidth(STRING_EDIT_WIDTH)
+    stringDialogEdit:SetText(text or "")
+    if mode == "export" then
+        stringDialogTitle:SetText("Export Loadout")
+        stringDialogHint:SetText("Select all and copy (Ctrl+A, Ctrl+C).")
+        btnStringImport:Hide()
+        btnStringImportApply:Hide()
+        stringDialog:Show()
+        stringDialogEdit:SetFocus()
+        stringDialogEdit:HighlightText()
+    else
+        stringDialogTitle:SetText("Import Loadout")
+        stringDialogHint:SetText("Paste a TM1 export string, then click Import or Import & Apply.")
+        btnStringImport:Show()
+        btnStringImportApply:Show()
+        stringDialog:Show()
+        stringDialogEdit:SetFocus()
+    end
+end
+
+btnStringImport:SetScript("OnClick", function()
+    ImportLoadoutFromString(stringDialogEdit:GetText(), false)
+    stringDialog:Hide()
+end)
+
+btnStringImportApply:SetScript("OnClick", function()
+    ImportLoadoutFromString(stringDialogEdit:GetText(), true)
+    stringDialog:Hide()
+end)
+
+local function ShowExportLoadoutDialog()
+    local loadout = ns.NormalizeLoadoutTable(GetLoadoutForExport())
+    local encoded, err = ns.SerializeLoadout(loadout)
+    if not encoded then
+        SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: |cffff0000Export failed:|r " .. (err or "unknown error"))
+        return
+    end
+    ShowStringDialog("export", encoded)
+    PrintExportStringToChat(encoded)
+end
+
+local function ShowImportLoadoutDialog()
+    ShowStringDialog("import", "")
+end
+
+btnExport:SetScript("OnClick", ShowExportLoadoutDialog)
+btnImport:SetScript("OnClick", ShowImportLoadoutDialog)
+
+function ns.ExportActiveLoadoutString()
+    local loadout = GetLoadoutForExport()
+    return ns.SerializeLoadout(loadout)
+end
+
+function ns.ImportLoadoutString(encoded, applyAfter)
+    return ImportLoadoutFromString(encoded, applyAfter)
+end
+
+ns.CaptureCurrentLoadout = CaptureCurrentLoadout
+ns.ApplyLoadout = ApplyLoadout
+ns.ShowExportLoadoutDialog = ShowExportLoadoutDialog
+ns.ShowImportLoadoutDialog = ShowImportLoadoutDialog
 
 appearancesTab:SetScript("OnShow", function()
     if activeLookId == "CURRENT" then
