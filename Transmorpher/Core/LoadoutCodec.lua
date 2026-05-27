@@ -298,50 +298,6 @@ function ns.SerializeLoadout(loadout)
     return SanitizeExportString(encoded), nil
 end
 
-local function ShowCopyableDebug(text)
-    if not _G.TMDebugFrame then
-        local f = CreateFrame("Frame", "TMDebugFrame", UIParent)
-        f:SetSize(400, 350)
-        f:SetPoint("CENTER")
-        f:SetFrameStrata("FULLSCREEN_DIALOG")
-        f:SetBackdrop({
-            bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-            tile = true, tileSize = 32, edgeSize = 32,
-            insets = { left = 11, right = 12, top = 12, bottom = 11 }
-        })
-        f:SetMovable(true)
-        f:EnableMouse(true)
-        f:RegisterForDrag("LeftButton")
-        f:SetScript("OnDragStart", f.StartMoving)
-        f:SetScript("OnDragStop", f.StopMovingOrSizing)
-
-        local sf = CreateFrame("ScrollFrame", "TMDebugScroll", f, "UIPanelScrollFrameTemplate")
-        sf:SetPoint("TOPLEFT", 20, -20)
-        sf:SetPoint("BOTTOMRIGHT", -40, 40)
-
-        local eb = CreateFrame("EditBox", "TMDebugEditBox", sf)
-        eb:SetMultiLine(true)
-        eb:SetAutoFocus(true)
-        eb:SetFontObject(ChatFontNormal)
-        eb:SetWidth(330)
-        eb:SetHeight(300)
-        eb:SetScript("OnEscapePressed", function() f:Hide() end)
-        sf:SetScrollChild(eb)
-        f.editBox = eb
-
-        local btn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-        btn:SetSize(80, 22)
-        btn:SetPoint("BOTTOM", 0, 15)
-        btn:SetText("Close")
-        btn:SetScript("OnClick", function() f:Hide() end)
-        
-        table.insert(UISpecialFrames, "TMDebugFrame")
-    end
-    _G.TMDebugFrame.editBox:SetText(text)
-    _G.TMDebugFrame.editBox:HighlightText()
-    _G.TMDebugFrame:Show()
-end
 
 function ns.DeserializeLoadoutString(encoded)
     if type(encoded) ~= "string" then
@@ -366,20 +322,6 @@ function ns.DeserializeLoadoutString(encoded)
     end
 
     local parts = SplitPipe(encoded)
-    local n = #parts
-
-    -- Debug output
-    local debugStr = ""
-    local chatFrame = SELECTED_CHAT_FRAME or DEFAULT_CHAT_FRAME
-    local function AddDebug(msg)
-        debugStr = debugStr .. msg .. "\n"
-        if chatFrame then chatFrame:AddMessage(msg) end
-    end
-
-    AddDebug("|cff00ff00[TM DEBUG]|r parts count: " .. n)
-    for i = 1, n do
-        AddDebug("|cff00ff00[TM DEBUG]|r parts[" .. i .. "] = \"" .. tostring(parts[i]) .. "\"")
-    end
 
     if parts[1] ~= FORMAT_TAG then
         return nil, "unsupported export string (expected " .. FORMAT_TAG .. ")"
@@ -442,12 +384,7 @@ function ns.DeserializeLoadoutString(encoded)
     local title     = remaining[10] or "0"
     local mountsStr = remaining[11] or ""
 
-    -- Debug output
-    AddDebug("|cff00ff00[TM DEBUG]|r emh=" .. tostring(emh) .. " eoh=" .. tostring(eoh) .. " mount=" .. tostring(mount) .. " mhidden=" .. tostring(mhidden))
-    AddDebug("|cff00ff00[TM DEBUG]|r pet=" .. tostring(pet) .. " hpet=" .. tostring(hpet) .. " hps=" .. tostring(hpscale100) .. " morph=" .. tostring(morph))
-    AddDebug("|cff00ff00[TM DEBUG]|r ms=" .. tostring(mscale100) .. " title=" .. tostring(title) .. " mounts=" .. tostring(mountsStr))
 
-    ShowCopyableDebug(debugStr)
 
     local items = ParseItemList(itemsStr)
     local hiddenSlots = ParseHiddenList(hiddenStr, items)
