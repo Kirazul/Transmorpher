@@ -79,15 +79,15 @@ local function ParseSpecialFields(parts, idx)
     if parts[idx] == "0" and parts[idx + 1] == "0" and parts[idx + 2] == "0" then
         local mountVal = tonumber(parts[idx + 3])
         if mountVal and mountVal > 0 then
-            return "", "0", "0", parts[idx + 3], parts[idx + 4], parts[idx + 5],
-                parts[idx + 6], parts[idx + 7], parts[idx + 8], parts[idx + 9], parts[idx + 10], parts[idx + 11]
+            return {"", "0", "0", parts[idx + 3], parts[idx + 4], parts[idx + 5],
+                parts[idx + 6], parts[idx + 7], parts[idx + 8], parts[idx + 9], parts[idx + 10], parts[idx + 11]}
         end
     end
     if parts[idx] == "0" and parts[idx + 1] == "0" then
         local mountVal = tonumber(parts[idx + 2])
         if mountVal and mountVal > 0 then
-            return "", "0", "0", parts[idx + 2], parts[idx + 3], parts[idx + 4],
-                parts[idx + 5], parts[idx + 6], parts[idx + 7], parts[idx + 8], parts[idx + 9], parts[idx + 10]
+            return {"", "0", "0", parts[idx + 2], parts[idx + 3], parts[idx + 4],
+                parts[idx + 5], parts[idx + 6], parts[idx + 7], parts[idx + 8], parts[idx + 9], parts[idx + 10]}
         end
     end
     return nil
@@ -298,6 +298,51 @@ function ns.SerializeLoadout(loadout)
     return SanitizeExportString(encoded), nil
 end
 
+local function ShowCopyableDebug(text)
+    if not _G.TMDebugFrame then
+        local f = CreateFrame("Frame", "TMDebugFrame", UIParent)
+        f:SetSize(400, 350)
+        f:SetPoint("CENTER")
+        f:SetFrameStrata("FULLSCREEN_DIALOG")
+        f:SetBackdrop({
+            bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+            tile = true, tileSize = 32, edgeSize = 32,
+            insets = { left = 11, right = 12, top = 12, bottom = 11 }
+        })
+        f:SetMovable(true)
+        f:EnableMouse(true)
+        f:RegisterForDrag("LeftButton")
+        f:SetScript("OnDragStart", f.StartMoving)
+        f:SetScript("OnDragStop", f.StopMovingOrSizing)
+
+        local sf = CreateFrame("ScrollFrame", "TMDebugScroll", f, "UIPanelScrollFrameTemplate")
+        sf:SetPoint("TOPLEFT", 20, -20)
+        sf:SetPoint("BOTTOMRIGHT", -40, 40)
+
+        local eb = CreateFrame("EditBox", "TMDebugEditBox", sf)
+        eb:SetMultiLine(true)
+        eb:SetAutoFocus(true)
+        eb:SetFontObject(ChatFontNormal)
+        eb:SetWidth(330)
+        eb:SetHeight(300)
+        eb:SetScript("OnEscapePressed", function() f:Hide() end)
+        sf:SetScrollChild(eb)
+        f.editBox = eb
+
+        local btn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+        btn:SetSize(80, 22)
+        btn:SetPoint("BOTTOM", 0, 15)
+        btn:SetText("Close")
+        btn:SetScript("OnClick", function() f:Hide() end)
+        
+        table.insert(UISpecialFrames, "TMDebugFrame")
+    end
+    _G.TMDebugFrame.editBox:SetText(text)
+    _G.TMDebugFrame.editBox:HighlightText()
+    _G.TMDebugFrame:Show()
+end
+
 function ns.DeserializeLoadoutString(encoded)
     if type(encoded) ~= "string" then
         return nil, "export string must be text"
@@ -308,59 +353,101 @@ function ns.DeserializeLoadoutString(encoded)
         return nil, "export string is empty"
     end
 
+    -- Fix double pipes caused by WoW EditBox escaping
+    encoded = encoded:gsub("||", "|")
+
+    -- Strip trailing pipe if present (export always adds one via empty mounts field)
+    if encoded:sub(-1) == "|" then
+        encoded = encoded:sub(1, -2)
+    end
+
     if encoded:sub(1, #FORMAT_TAG) ~= FORMAT_TAG then
         return nil, "unsupported export string (expected " .. FORMAT_TAG .. ")"
     end
 
     local parts = SplitPipe(encoded)
+    local n = #parts
+
+    -- Debug output
+    local debugStr = ""
+    local chatFrame = SELECTED_CHAT_FRAME or DEFAULT_CHAT_FRAME
+    local function AddDebug(msg)
+        debugStr = debugStr .. msg .. "\n"
+        if chatFrame then chatFrame:AddMessage(msg) end
+    end
+
+    AddDebug("|cff00ff00[TM DEBUG]|r parts count: " .. n)
+    for i = 1, n do
+        AddDebug("|cff00ff00[TM DEBUG]|r parts[" .. i .. "] = \"" .. tostring(parts[i]) .. "\"")
+    end
+
     if parts[1] ~= FORMAT_TAG then
         return nil, "unsupported export string (expected " .. FORMAT_TAG .. ")"
     end
 
-    local name, itemsStr, hiddenStr, emh, eoh, mount, mhidden, pet, hpet
-    local hpscale100, morph, mscale100, title, mountsStr
+    -- ============================================================
+    -- SCHEMA-AWARE PARSING
+    -- Dynamically maps remaining fields based on export structure,
+    -- allowing backward compatibility with older string versions.
+    -- ============================================================
+
     local idx = 2
 
+    -- Skip version field if present
     if parts[idx] == FORMAT_VERSION then
         idx = idx + 1
     end
 
-    name = parts[idx]
+    -- Extract name
+    local name = parts[idx] or ""
     idx = idx + 1
 
+    -- Locate items CSV by pattern (handles variable-length prefixes)
     local itemsIdx = FindItemsFieldIndex(parts, idx)
     if not itemsIdx then
         return nil, "export string is missing item data (copy the full string)"
     end
-    itemsStr = parts[itemsIdx]
+    local itemsStr = parts[itemsIdx]
     idx = itemsIdx + 1
 
-    local legacy = ParseSpecialFields(parts, idx)
-    if legacy then
-        hiddenStr, emh, eoh, mount, mhidden, pet, hpet, hpscale100, morph, mscale100, title, mountsStr = legacy
-    else
-        if parts[idx] == EMPTY_HIDDEN_MARKER then
-            hiddenStr = ""
-            idx = idx + 1
-        elseif LooksLikeHiddenCsv(parts[idx]) then
-            hiddenStr = parts[idx]
-            idx = idx + 1
-        else
-            hiddenStr = ""
-        end
-
-        emh = parts[idx]; idx = idx + 1
-        eoh = parts[idx]; idx = idx + 1
-        mount = parts[idx]; idx = idx + 1
-        mhidden = parts[idx]; idx = idx + 1
-        pet = parts[idx]; idx = idx + 1
-        hpet = parts[idx]; idx = idx + 1
-        hpscale100 = parts[idx]; idx = idx + 1
-        morph = parts[idx]; idx = idx + 1
-        mscale100 = parts[idx]; idx = idx + 1
-        title = parts[idx]; idx = idx + 1
-        mountsStr = parts[idx]
+    -- Detect hidden CSV
+    local hiddenStr = ""
+    if parts[idx] == EMPTY_HIDDEN_MARKER then
+        hiddenStr = ""
+        idx = idx + 1
+    elseif LooksLikeHiddenCsv(parts[idx]) then
+        hiddenStr = parts[idx]
+        idx = idx + 1
     end
+
+    -- Check for legacy misaligned fields
+    local remaining = ParseSpecialFields(parts, idx)
+    if not remaining then
+        remaining = {}
+        for i = idx, #parts do
+            table.insert(remaining, parts[i])
+        end
+    end
+
+    -- Map remaining fields dynamically (schema-aware)
+    local emh       = remaining[1] or "0"
+    local eoh       = remaining[2] or "0"
+    local mount     = remaining[3] or "0"
+    local mhidden   = remaining[4] or "0"
+    local pet       = remaining[5] or "0"
+    local hpet      = remaining[6] or "0"
+    local hpscale100 = remaining[7] or "100"
+    local morph     = remaining[8] or "0"
+    local mscale100 = remaining[9] or "100"
+    local title     = remaining[10] or "0"
+    local mountsStr = remaining[11] or ""
+
+    -- Debug output
+    AddDebug("|cff00ff00[TM DEBUG]|r emh=" .. tostring(emh) .. " eoh=" .. tostring(eoh) .. " mount=" .. tostring(mount) .. " mhidden=" .. tostring(mhidden))
+    AddDebug("|cff00ff00[TM DEBUG]|r pet=" .. tostring(pet) .. " hpet=" .. tostring(hpet) .. " hps=" .. tostring(hpscale100) .. " morph=" .. tostring(morph))
+    AddDebug("|cff00ff00[TM DEBUG]|r ms=" .. tostring(mscale100) .. " title=" .. tostring(title) .. " mounts=" .. tostring(mountsStr))
+
+    ShowCopyableDebug(debugStr)
 
     local items = ParseItemList(itemsStr)
     local hiddenSlots = ParseHiddenList(hiddenStr, items)

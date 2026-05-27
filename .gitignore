@@ -13,4 +13,9 @@ StealthMorpher/build/
 # Transmorpher DB files
 Transmorpher/db/TitlesDB.lua
 
+# Local instruction and issue logs
+instructions.md
+issue.md
+
+
 
