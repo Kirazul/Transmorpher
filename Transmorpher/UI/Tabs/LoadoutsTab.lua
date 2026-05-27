@@ -1179,6 +1179,46 @@ local function GetLoadoutForExport()
     return cur
 end
 
+StaticPopupDialogs["TRANSMORPHER_IMPORT_CONFLICT"] = {
+    text = "A loadout named '%s' already exists.\n\nChoose 'Overwrite' to replace it, or enter a new name and choose 'Save New'.",
+    button1 = "Overwrite",
+    button2 = "Cancel",
+    button3 = "Save New",
+    hasEditBox = true,
+    OnShow = function(self, data)
+        self.editBox:SetText(data.loadout.name .. " (Imported)")
+        self.editBox:HighlightText()
+    end,
+    OnAccept = function(self, data)
+        local saved = GetSavedLoadouts()
+        data.loadout.uid = saved[data.existingIndex].uid
+        saved[data.existingIndex] = data.loadout
+        data.callback(data.existingIndex, data.loadout)
+    end,
+    OnAlt = function(self, data)
+        local newName = self.editBox:GetText()
+        if newName == "" then newName = data.loadout.name .. " (Imported)" end
+        data.loadout.name = newName
+        data.loadout.uid = EnsureLoadoutUid(data.loadout)
+        local saved = GetSavedLoadouts()
+        table.insert(saved, data.loadout)
+        data.callback(#saved, data.loadout)
+    end,
+    EditBoxOnEnterPressed = function(self, data)
+        local newName = self:GetText()
+        if newName == "" then newName = data.loadout.name .. " (Imported)" end
+        data.loadout.name = newName
+        data.loadout.uid = EnsureLoadoutUid(data.loadout)
+        local saved = GetSavedLoadouts()
+        table.insert(saved, data.loadout)
+        data.callback(#saved, data.loadout)
+        self:GetParent():Hide()
+    end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+}
+
 local function ImportLoadoutFromString(encoded, applyAfter)
     encoded = encoded and encoded:match("^%s*(.-)%s*$") or ""
     local loadout, err = ns.DeserializeLoadoutString(encoded)
@@ -1188,19 +1228,45 @@ local function ImportLoadoutFromString(encoded, applyAfter)
     end
     loadout = ns.NormalizeLoadoutTable(loadout)
     EnsureLoadoutUid(loadout)
-    table.insert(GetSavedLoadouts(), loadout)
-    activeLookId = #GetSavedLoadouts()
-    BuildListFrames()
-    UpdateLoadoutPreview(loadout)
-    SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Imported loadout '" .. (loadout.name or "Loadout") .. "'.")
-    PlaySound("gsTitleOptionOK")
-    if applyAfter then
-        if ns.IsMorpherReady() then
-            ApplyLoadout(loadout)
-        else
-            SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: |cffff0000DLL not loaded|r — loadout saved but not applied.")
+
+    local function FinishImport(idx, finalLoadout)
+        activeLookId = idx
+        BuildListFrames()
+        UpdateLoadoutPreview(finalLoadout)
+        SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Imported loadout '" .. (finalLoadout.name or "Loadout") .. "'.")
+        PlaySound("gsTitleOptionOK")
+        if applyAfter then
+            if ns.IsMorpherReady() then
+                ApplyLoadout(finalLoadout)
+            else
+                SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: |cffff0000DLL not loaded|r — loadout saved but not applied.")
+            end
         end
     end
+
+    local saved = GetSavedLoadouts()
+    local conflictIdx = nil
+    for i = 1, #saved do
+        if saved[i].name == loadout.name then
+            conflictIdx = i
+            break
+        end
+    end
+
+    if conflictIdx then
+        local dialog = StaticPopup_Show("TRANSMORPHER_IMPORT_CONFLICT", loadout.name)
+        if dialog then
+            dialog.data = {
+                loadout = loadout,
+                existingIndex = conflictIdx,
+                callback = FinishImport
+            }
+        end
+    else
+        table.insert(saved, loadout)
+        FinishImport(#saved, loadout)
+    end
+
     return true
 end
 
