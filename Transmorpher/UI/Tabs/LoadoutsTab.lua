@@ -1254,14 +1254,12 @@ local function ImportLoadoutFromString(encoded, applyAfter)
     end
 
     if conflictIdx then
-        local dialog = StaticPopup_Show("TRANSMORPHER_IMPORT_CONFLICT", loadout.name)
-        if dialog then
-            dialog.data = {
-                loadout = loadout,
-                existingIndex = conflictIdx,
-                callback = FinishImport
-            }
-        end
+        local data = {
+            loadout = loadout,
+            existingIndex = conflictIdx,
+            callback = FinishImport
+        }
+        StaticPopup_Show("TRANSMORPHER_IMPORT_CONFLICT", loadout.name, nil, data)
     else
         table.insert(saved, loadout)
         FinishImport(#saved, loadout)
