@@ -1,0 +1,12 @@
+Version MSBuild 17.14.40+3e7442088 pour .NET Framework
+
+  Checking File Globs
+  Detours.vcxproj -> C:\Users\KIRA\Desktop\Transmorpher-main - Copie (2)\StealthMorpher\build\third_party\Detours\Release\Detours.lib
+  freetype.vcxproj -> C:\Users\KIRA\Desktop\Transmorpher-main - Copie (2)\StealthMorpher\build\third_party\freetype-2.14.1\Release\freetype.lib
+  msdfgen-core.vcxproj -> C:\Users\KIRA\Desktop\Transmorpher-main - Copie (2)\StealthMorpher\build\third_party\msdfgen\Release\msdfgen-core.lib
+  msdfgen-ext.vcxproj -> C:\Users\KIRA\Desktop\Transmorpher-main - Copie (2)\StealthMorpher\build\third_party\msdfgen\Release\msdfgen-ext.lib
+  Morpher.cpp
+C:/Users/KIRA/Desktop/Transmorpher-main - Copie (2)/StealthMorpher/src/dinput8_exports.def : warning LNK4104: l'exportation du symbole 'DllCanUnloadNow' doit être PRIVATE [C:\Users\KIRA\Desktop\Transmorpher-main - Copie (2)\StealthMorpher\build\dinput8.vcxproj]
+C:/Users/KIRA/Desktop/Transmorpher-main - Copie (2)/StealthMorpher/src/dinput8_exports.def : warning LNK4104: l'exportation du symbole 'DllGetClassObject' doit être PRIVATE [C:\Users\KIRA\Desktop\Transmorpher-main - Copie (2)\StealthMorpher\build\dinput8.vcxproj]
+     Création de la bibliothèque C:/Users/KIRA/Desktop/Transmorpher-main - Copie (2)/StealthMorpher/build/Release/dinput8.lib et de l'objet C:/Users/KIRA/Desktop/Transmorpher-main - Copie (2)/StealthMorpher/build/Release/dinput8.exp
+  dinput8.vcxproj -> C:\Users\KIRA\Desktop\Transmorpher-main - Copie (2)\StealthMorpher\build\Release\Release\dinput8.dll

@@ -1,0 +1,29 @@
+EXPORTS
+    ; dinput8
+    DirectInput8Create=dinput8_DirectInput8Create @1
+    GetdfDIJoystick=dinput8_GetdfDIJoystick @2
+    GetdfDIKeyboard=dinput8_GetdfDIKeyboard @3
+    GetdfDIMouse=dinput8_GetdfDIMouse @4
+    GetdfDIMouse2=dinput8_GetdfDIMouse2 @5
+
+    ; version
+    GetFileVersionInfoA=version_GetFileVersionInfoA @6
+    GetFileVersionInfoW=version_GetFileVersionInfoW @7
+    GetFileVersionInfoSizeA=version_GetFileVersionInfoSizeA @8
+    GetFileVersionInfoSizeW=version_GetFileVersionInfoSizeW @9
+    VerQueryValueA=version_VerQueryValueA @10
+    VerQueryValueW=version_VerQueryValueW @11
+
+    ; dsound
+    DirectSoundCreate=dsound_DirectSoundCreate @12
+    DirectSoundEnumerateA=dsound_DirectSoundEnumerateA @13
+    DirectSoundEnumerateW=dsound_DirectSoundEnumerateW @14
+    DllCanUnloadNow=dsound_DllCanUnloadNow @15
+    DllGetClassObject=dsound_DllGetClassObject @16
+    DirectSoundCaptureCreate=dsound_DirectSoundCaptureCreate @17
+    DirectSoundCaptureEnumerateA=dsound_DirectSoundCaptureEnumerateA @18
+    DirectSoundCaptureEnumerateW=dsound_DirectSoundCaptureEnumerateW @19
+    GetDeviceID=dsound_GetDeviceID @20
+    DirectSoundFullDuplexCreate=dsound_DirectSoundFullDuplexCreate @21
+    DirectSoundCreate8=dsound_DirectSoundCreate8 @22
+    DirectSoundCaptureCreate8=dsound_DirectSoundCaptureCreate8 @23

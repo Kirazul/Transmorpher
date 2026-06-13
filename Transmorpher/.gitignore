@@ -1,0 +1,25 @@
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# IDE
+*.suo
+*.user
+*.vs/
+.vscode/
+.idea/
+
+# Lua
+*.luac
+*.dump
+
+# Build artifacts
+build/
+*.obj
+*.exe
+*.dll
+*.lib
+*.pdb
+*.ilk
+*.exp

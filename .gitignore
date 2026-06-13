@@ -1,0 +1,28 @@
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# IDE
+*.suo
+*.user
+*.vs/
+.vscode/
+.idea/
+
+# Lua
+*.luac
+*.dump
+
+# Build artifacts
+StealthMorpher/build/
+*.obj
+*.exe
+*.dll
+*.lib
+*.pdb
+*.ilk
+*.exp
+
+# Third-party
+StealthMorpher/third_party/
