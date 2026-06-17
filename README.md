@@ -265,6 +265,221 @@ The addon supports both account-wide and per-character persistence.
 
 4. Launch the client and use `/morph` to open the UI or click the minimap button.
 
+## Changelog
+
+### 3.0.0
+
+#### New: Skin Tab
+
+- Full per-slot item texture recoloring system.
+- Change the texture of any equipment piece to any other item in the game.
+- Complete color customization per slot: color picker, tint intensity, contrast, brightness, saturation, hue, glow toggle.
+- Tint modes: Solid, Gradient, Rainbow, Two-Tone.
+- Direction control: Vertical, Horizontal, Diagonal.
+- Texture capture mode for discovering recolorable surfaces in-game.
+- Persistent account-wide storage for all recolor data.
+
+#### New: Barber Tab
+
+- Full barbershop control panel with DBC-driven options.
+- Customize skin tone, face, hair style, hair color, facial hair.
+- Per-region free-RGB tinting with Solid, Gradient, Rainbow, and Two-Tone modes.
+- Full saturation, brightness, contrast, and hue sliders per region.
+- Glow toggle with animated breathing effect.
+
+#### New: Aura Tab
+
+- Add infinite persistent auras with loop animation support.
+- Stack multiple auras simultaneously (e.g. Devotion Aura on loop while stacking other effects).
+- Browse all spell visuals in-game and attach them to your character permanently.
+- Auras persist through morphs, forms, zoning, and relogs.
+- Global persist toggle, auto-heal toggle, and mute toggle.
+- Search by spell name or numeric ID.
+
+#### New: Weapon Position Control
+
+- Change main-hand and off-hand weapon position between Back and Hips.
+- Hide main-hand and/or off-hand weapons entirely.
+- Applies to the character model in real time.
+
+#### New: Morph Tab Quick Actions
+
+- Random morph button: instantly apply a random creature display morph.
+- Copy target morph: morph to your current target's creature display (NPC targets only for now).
+
+#### New: Weather and Sky Control (Misc > World)
+
+- Control weather state: Clear, Rain, Snow, Sandstorm.
+- Adjust weather intensity with a slider.
+- Full skybox library: browse and apply any skybox in the WoW 3.3.5a database.
+- Client-side only, does not affect other players.
+
+#### New: FOV Unlock (Misc > Atmosphere)
+
+- Camera field of view now unlockable up to 350 degrees.
+- Sliders for fine-grained FOV control.
+- Instant reset to default FOV.
+
+#### New: Units Sub-Tab (Misc)
+
+- Hide other players.
+- Hide pets, summons, and NPCs.
+- Hide corpses.
+- Toggle ground effects.
+- Toggle shadows.
+- Toggle nameplates.
+- Toggle chat bubbles.
+- Toggle player sounds.
+
+#### Reworked: Optimize Tab (Beta)
+
+- Complete rewrite of the optimization system.
+- Hide spell visuals based on PLAYER class and role.
+- Filter by boss, NPC, and elite classification.
+- 15 individual visual part categories with granular toggle control.
+- Raid tier protection for T7, T8, T9, T10, and VOA.
+- Protected spell list with search, add, remove, reload, and export.
+- Unit suppression for targeted filtering.
+
+#### New: Color Tab
+
+- Full damage text color customization across all 8 categories.
+- Per-category color picker with independent rainbow mode.
+- Global damage text size slider.
+- Live preview of color changes.
+
+#### New: Character Selection Persistence
+
+- Race, equipment, and color customization now visible on the character selection screen.
+- True transmog preview before logging in.
+
+#### Fixes
+
+- Fixed double refresh on teleport and login.
+- Optimized addon performance and memory usage.
+- Fixed crash error when exiting the game.
+- Fixed fog and far clip overrides not properly disabling (config payload now always sent).
+- Fixed camera FOV not instantly resetting to default.
+- Fixed mount morph bugging in specific zones.
+- Fixed morph leaking between characters.
+- Fixed flickering when zoning or reloading.
+
+#### Optimization
+
+- Reduced CPU usage across all subsystems.
+- Smarter spell visual filtering with less performance overhead.
+- Improved loadout apply speed.
+
+### 2.0.0
+
+- Added Analysis Tab with 21 render analysis toggles.
+- Added HD Font Tab with MSDF font system.
+- Added Atmosphere Tab with fog and far clip controls.
+- Complete Optimization overhaul with 15 spell part categories.
+- Raid protection tier toggles (T7-T10, VOA).
+- Protected file management system.
+
+### 1.2.2
+
+- Fixed minor bugs.
+- Added more ICC and RS spells to Optimization filter.
+- Fixed mount morph bug.
+
+### 1.2.1
+
+- Added dungeon and raid spell filter for Optimization.
+- Fixed mount invisibility on vehicle interaction.
+
+### 1.2.0
+
+- Full persistence system rewrite (per-character state files).
+- Mount morphing with instant mount morph.
+- Spell morphing with compatibility checks.
+- 16 animation control options for spell visuals.
+- Fixed flickering, morph leaking, and crash scenarios.
+
+### 1.1.9
+
+- Fixed mount morph in specific zones.
+- Fixed mount morph preventing dismount.
+
+### 1.1.8
+
+- Fixed DLL load failure.
+- Fixed crash on teleport.
+- Fixed sync system.
+- Added multi-client support.
+- Added spec-bound loadouts.
+
+### 1.1.7
+
+- Removed Party/Raid sync.
+- Added sync filters.
+- Fixed world sync and whisper spam.
+
+### 1.1.6
+
+- Fixed mount invisibility on reload.
+- Removed weapon morph flickering.
+- Added Show/Hide button and Minimap button.
+- UI and quality-of-life improvements.
+
+### 1.1.5
+
+- Added 3D preview to Enchant tab.
+- Added Forms morphing (13 groups).
+- Added multiplayer synchronization.
+
+### 1.1.4
+
+- Fixed hunter combat pet IDs.
+- Fixed morph size persistence.
+- Fixed keybind conflicts.
+- Added Sets system (441 class sets).
+- Added time control and title morphing.
+
+### 1.1.2
+
+- Fixed hunter combat pet IDs.
+- Added Sets system, time control, title morphing.
+
+### 1.1.0
+
+- Fixed crash with in-game vehicles.
+
+### 1.0.9
+
+- Fixed race morph for majority of races.
+- Added gearless presets for races without gearless models.
+
+### 1.0.5
+
+- Complete Dressing Room overhaul.
+- Added glow indicator, hide equipment, enchant morphing, loadout system.
+- Fixed mount and pet IDs.
+- Major UI improvements.
+
+### 1.0.3
+
+- Added mount morphing with full WotLK database.
+- Added companion and combat pet morphing.
+- Added appearance preview.
+
+### 1.0.2
+
+- Improved weapon transmog handling.
+- Added shapeshift keep morph and DBW disable settings.
+
+### 1.0.1
+
+- Fixed incorrect creature IDs.
+- Removed weapon restrictions.
+- Fixed morphs after shapeshift and teleport.
+
+### 1.0.0
+
+- Initial release.
+
 ## Summary
 
 Transmorpher is not just a transmog browser. It is a unified visual control panel for WotLK 3.3.5a that combines appearance morphing, spell visuals, form overrides, barber controls, item recolor, creature/mount recoloring, texture capture, aura swaps, persistent visuals, damage text colors, loadouts, sync, distance culling, spell optimization, render analysis, and world-side client customization into a single addon workflow.
