@@ -1159,6 +1159,7 @@ void ForceRefreshComponents(WowObject* player);   // fwd: RefreshAllComponentIte
 // --- TEMP weapon diagnostic: plain file next to wow.exe (NOT TSM_logs), bounded. -----------
 static volatile LONG g_wdiagLines = 0;
 static void WDiag(const char* fmt, ...) {
+    return; // deactivated
     if (g_wdiagLines >= 400) return;
     char body[400]; va_list ap; va_start(ap, fmt);
     _vsnprintf_s(body, sizeof(body), _TRUNCATE, fmt, ap); va_end(ap);

@@ -1529,6 +1529,7 @@ namespace {
     static volatile LONG g_scopeDiagLines = 0;
     static const LONG    SCOPE_DIAG_MAX   = 8000;
     static void ScopeDiag(const char* fmt, ...) {
+        return; // deactivated
         if (g_isProcessTerminating) return;
         if (!(g_texActive || g_sfileActive)) return;          // only while a recolor is active
         if (g_scopeDiagLines >= SCOPE_DIAG_MAX) return;
@@ -1568,6 +1569,7 @@ namespace {
     // slot index to mark, so the "weapon needs relog" re-attach can be written with no guessing.
     static volatile LONG g_compDumpCount = 0;
     static void DumpComponentEntries(void* unit) {
+        return; // deactivated
         if (g_isProcessTerminating || !unit || (uintptr_t)unit < 0x10000) return;
         if (g_compDumpCount >= 6) return;            // a few snapshots is plenty
         __try {
