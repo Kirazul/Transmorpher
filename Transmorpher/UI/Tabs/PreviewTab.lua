@@ -10,63 +10,6 @@ local _, raceFileName = UnitRace("player")
 local sex = UnitSex("player")
 local previewSetupVersion = "classic"
 
--- Character Preview refreshes are expensive: skin/barber changes can fire several
--- native/model events in one click. Keep those paths behind one debounced scheduler.
-do
-    local previewRefresh = CreateFrame("Frame")
-    previewRefresh:Hide()
-    previewRefresh.syncAt = nil
-    previewRefresh.itemsAt = nil
-    previewRefresh.forceLive = false
-
-    local function At(delay)
-        return GetTime() + math.max(0, tonumber(delay) or 0)
-    end
-
-    previewRefresh:SetScript("OnUpdate", function(self)
-        local now = GetTime()
-        local syncDue = self.syncAt and now >= self.syncAt
-        local itemsDue = self.itemsAt and now >= self.itemsAt
-        if not syncDue and not itemsDue then return end
-
-        local forceLive = self.forceLive
-        if syncDue then self.syncAt = nil; self.forceLive = false end
-        if itemsDue then self.itemsAt = nil end
-
-        local dr = mainFrame and mainFrame.dressingRoom
-        if dr then
-            local previewWasActive = dr.previewActive
-            if syncDue then
-                if forceLive then dr.forceLiveAfterSync = true end
-                if ns.SyncDressingRoom then
-                    ns.SyncDressingRoom()
-                elseif dr.RefreshLiveUnit then
-                    dr:RefreshLiveUnit()
-                elseif dr.SetUnit then
-                    dr:SetUnit("player")
-                end
-            end
-            if itemsDue and dr.PreviewApplyItems and not (syncDue and previewWasActive) then
-                dr:PreviewApplyItems()
-            end
-        end
-
-        if not self.syncAt and not self.itemsAt then self:Hide() end
-    end)
-
-    function ns.QueueCharacterPreviewSync(delay, forceLive)
-        local target = At(delay or 0.08)
-        previewRefresh.syncAt = math.max(previewRefresh.syncAt or 0, target)
-        previewRefresh.forceLive = previewRefresh.forceLive or forceLive or false
-        previewRefresh:Show()
-    end
-
-    function ns.QueuePreviewApplyItems(delay)
-        previewRefresh.itemsAt = At(delay or 0.03)
-        previewRefresh:Show()
-    end
-end
-
 -- Sub-tabs Containers
 local itemsSubTab = CreateFrame("Frame", "$parentItemsSubTab", mainFrame.tabs.preview)
 itemsSubTab:SetPoint("TOPLEFT", 0, -50); itemsSubTab:SetPoint("BOTTOMRIGHT")
@@ -105,14 +48,14 @@ local function CreateSubTabButton(parent, id, text)
     local bg = btn:CreateTexture(nil, "BACKGROUND"); bg:SetAllPoints(); bg:SetTexture(1,1,1,0); btn.bg = bg
     local line = btn:CreateTexture(nil, "OVERLAY"); line:SetHeight(2)
     line:SetPoint("BOTTOMLEFT", 15, 0); line:SetPoint("BOTTOMRIGHT", -15, 0)
-    line:SetTexture(1, 0.82, 0); line:Hide(); btn.line = line
-    local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal"); fs:SetPoint("CENTER"); fs:SetText(text); fs:SetTextColor(0.5,0.5,0.5); btn.fs = fs
+    line:SetTexture(1.00, 0.82, 0.24); line:Hide(); btn.line = line
+    local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal"); fs:SetPoint("CENTER"); fs:SetText(text); fs:SetTextColor(0.58,0.52,0.40); btn.fs = fs
     btn.SetActive = function(self, active) self.isActive = active
-        if active then self.line:Show(); self.fs:SetTextColor(1,1,1); self.bg:SetTexture(1,1,1,0.05)
-        else self.line:Hide(); self.fs:SetTextColor(0.5,0.5,0.5); self.bg:SetTexture(0,0,0,0) end
+        if active then self.line:Show(); self.fs:SetTextColor(1.00,0.86,0.38); self.bg:SetTexture(1.00,0.76,0.22,0.06)
+        else self.line:Hide(); self.fs:SetTextColor(0.58,0.52,0.40); self.bg:SetTexture(0,0,0,0) end
     end
-    btn:SetScript("OnEnter", function(self) if not self.isActive then self.fs:SetTextColor(0.9,0.9,0.9); self.bg:SetTexture(1,1,1,0.03) end end)
-    btn:SetScript("OnLeave", function(self) if not self.isActive then self.fs:SetTextColor(0.5,0.5,0.5); self.bg:SetTexture(0,0,0,0) end end)
+    btn:SetScript("OnEnter", function(self) if not self.isActive then self.fs:SetTextColor(0.88,0.76,0.48); self.bg:SetTexture(1.00,0.76,0.22,0.035) end end)
+    btn:SetScript("OnLeave", function(self) if not self.isActive then self.fs:SetTextColor(0.58,0.52,0.40); self.bg:SetTexture(0,0,0,0) end end)
     return btn
 end
 
@@ -222,7 +165,7 @@ do
     previewTab.dropContainer = dropContainer
     dropContainer:SetSize(170, 26); dropContainer:SetPoint("TOPRIGHT", -6, -2)
     dropContainer:SetBackdrop({bgFile="Interface\\ChatFrame\\ChatFrameBackground", edgeFile="Interface\\Buttons\\WHITE8X8", tile=false, tileSize=0, edgeSize=1, insets={left=1,right=1,top=1,bottom=1}})
-    dropContainer:SetBackdropColor(0.08, 0.08, 0.08, 0.95); dropContainer:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+    dropContainer:SetBackdropColor(0.050, 0.043, 0.032, 0.96); dropContainer:SetBackdropBorderColor(0.62, 0.49, 0.16, 0.85)
 
     local dropBtn = CreateFrame("Button", "$parentSubDropBtn", dropContainer)
     previewTab.dropBtn = dropBtn; dropBtn:SetAllPoints(); dropBtn:EnableMouse(true)
@@ -239,7 +182,7 @@ do
     previewTab.dropList = dropList
     dropList:SetPoint("TOPLEFT", dropContainer, "BOTTOMLEFT", 0, 2); dropList:SetPoint("TOPRIGHT", dropContainer, "BOTTOMRIGHT", 0, 2)
     dropList:SetBackdrop({bgFile="Interface\\ChatFrame\\ChatFrameBackground", edgeFile="Interface\\Buttons\\WHITE8X8", tile=false, tileSize=0, edgeSize=1, insets={left=1,right=1,top=1,bottom=1}})
-    dropList:SetBackdropColor(0.08, 0.08, 0.08, 0.97); dropList:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+    dropList:SetBackdropColor(0.050, 0.043, 0.032, 0.98); dropList:SetBackdropBorderColor(0.62, 0.49, 0.16, 0.90)
     dropList:SetFrameStrata("DIALOG"); dropList:Hide()
     local DROP_ROW_H = 20; previewTab.DROP_ROW_H = DROP_ROW_H
     local dropListButtons = {}; previewTab.dropListButtons = dropListButtons
@@ -248,7 +191,7 @@ do
     local searchContainer = CreateFrame("Frame", nil, previewTab)
     searchContainer:SetPoint("TOPLEFT", 6, -2); searchContainer:SetPoint("RIGHT", dropContainer, "LEFT", -6, 0); searchContainer:SetHeight(26)
     searchContainer:SetBackdrop({bgFile="Interface\\ChatFrame\\ChatFrameBackground", edgeFile="Interface\\Buttons\\WHITE8X8", tile=false, tileSize=0, edgeSize=1, insets={left=1,right=1,top=1,bottom=1}})
-    searchContainer:SetBackdropColor(0.08, 0.08, 0.08, 0.95); searchContainer:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+    searchContainer:SetBackdropColor(0.050, 0.043, 0.032, 0.96); searchContainer:SetBackdropBorderColor(0.62, 0.49, 0.16, 0.85)
 
     local searchIcon = searchContainer:CreateTexture(nil, "OVERLAY"); searchIcon:SetSize(14,14); searchIcon:SetPoint("LEFT", 6, 0)
     searchIcon:SetTexture("Interface\\Common\\UI-Searchbox-Icon"); searchIcon:SetVertexColor(0.80, 0.65, 0.22)
@@ -323,6 +266,8 @@ do
         previewTab.currSlot = slot; previewTab.currSubclass = subclass
         currSlot = slot; currSubclass = subclass
         records = ns.GetSubclassRecords(slot, subclass) or {}
+        list.previewSlotName = slot
+        list.tryOnItemSlotName = slot
 
         local query = previewTab.searchQuery or ""
         local filteredRecords, filteredItemIds = {}, {}
@@ -452,15 +397,11 @@ do
             ns.ShowWowheadURLDialog(itemId)
         else
             if mainFrame.selectedSlot then
-                mainFrame.selectedSlot:SetItem(itemId); ns.HideMorphGlow(mainFrame.selectedSlot)
-                -- Show the picked item on the Character Preview with a next-frame
-                -- faked apply: client-side only, no morph/sync. The real morph still happens
-                -- only on "Apply All".
-                if ns.QueuePreviewApplyItems then
-                    ns.QueuePreviewApplyItems(0.03)
-                elseif mainFrame.dressingRoom and mainFrame.dressingRoom.PreviewApplyItems then
-                    mainFrame.dressingRoom:PreviewApplyItems()
-                end
+                mainFrame.selectedSlot.isMorphed = false
+                mainFrame.selectedSlot.morphedItemId = nil
+                mainFrame.selectedSlot.isHiddenSlot = false
+                mainFrame.selectedSlot:SetItem(itemId)
+                ns.HideMorphGlow(mainFrame.selectedSlot)
             end
         end
         list.onEnter(self)
@@ -566,7 +507,9 @@ do
             if not previewTab.enchantMode or renderToken ~= previewTab.enchantRenderToken then return end
             list:SetCustomRenderer(function(dr, entry)
                 dr:OnUpdateModel(nil)
-                dr:TryOn(resolvedWeaponId)
+                local weaponSlot = (previewTab.enchantSlotName == "Enchant OH") and "Off-hand" or "Main Hand"
+                if ns.TryOnPreviewItem then ns.TryOnPreviewItem(dr, resolvedWeaponId, weaponSlot)
+                else dr:TryOn(resolvedWeaponId) end
                 dr:TryOn("item:"..resolvedWeaponId..":"..entry.id..":0:0:0:0:0:0")
                 dr:SetSequence(52)
             end)

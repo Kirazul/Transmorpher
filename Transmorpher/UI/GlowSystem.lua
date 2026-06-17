@@ -24,9 +24,15 @@ local morphGlowAnimFrame = CreateFrame("Frame")
 morphGlowAnimFrame:Hide()
 local morphGlowSlots = {}
 local morphGlowTimer = 0
+local morphGlowUpdateElapsed = 0
+local GLOW_UPDATE_INTERVAL = 1 / 30
 
 morphGlowAnimFrame:SetScript("OnUpdate", function(self, dt)
     morphGlowTimer = morphGlowTimer + dt
+    morphGlowUpdateElapsed = morphGlowUpdateElapsed + dt
+    if morphGlowUpdateElapsed < GLOW_UPDATE_INTERVAL then return end
+    local updateStep = morphGlowUpdateElapsed
+    morphGlowUpdateElapsed = 0
 
     -- Sync animations with different frequencies for "alive" feel
     local pulseFast = 0.5 + 0.5 * math.sin(morphGlowTimer * 5.0)
@@ -38,7 +44,7 @@ morphGlowAnimFrame:SetScript("OnUpdate", function(self, dt)
             -- Fade-in multiplier (0→1 over 0.3s)
             local fadeMul = 1
             if layers.fadeInElapsed then
-                layers.fadeInElapsed = layers.fadeInElapsed + dt
+                layers.fadeInElapsed = layers.fadeInElapsed + updateStep
                 if layers.fadeInElapsed < 0.3 then
                     fadeMul = layers.fadeInElapsed / 0.3
                 else
@@ -60,7 +66,7 @@ morphGlowAnimFrame:SetScript("OnUpdate", function(self, dt)
 
             -- Confirmation flash fade-out
             if layers.flash and layers.flashElapsed then
-                layers.flashElapsed = layers.flashElapsed + dt
+                layers.flashElapsed = layers.flashElapsed + updateStep
                 
                 -- Flash hold/fade durations
                 local holdTime = 1.0

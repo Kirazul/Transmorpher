@@ -670,7 +670,7 @@ static int __cdecl Lua_TransmorpherGetModelInfo(void* L) {
 // DressUpModel:TryOn/Undress do, but bypassing the Lua type check that rejects a
 // PlayerModel. All RE-verified on this wow.exe (build 12340):
 //   • DressUpModel:TryOn binding 0x00598830 → C TryOn  CSimpleModelFFX::TryOn  0x00597FC0
-//       __thiscall(model, itemId, 0, -1)  (item is a plain numeric id; ret 0xC)
+//       __thiscall(model, itemId, 0, slotId)  (-1 = auto slot; ret 0xC)
 //   • DressUpModel:Undress binding 0x00597E90 → C Undress 0x00597BA0  __thiscall(model)
 //   • widget→C-object: lua_rawgeti(L,idx,0) [0x0084E670] pushes widgetTable[0] (the
 //       object userdata), lua_touserdata(L,-1) [0x0084E1C0] returns the object ptr,
@@ -689,9 +689,10 @@ static int __cdecl Lua_TransmorpherGetModelInfo(void* L) {
 // PlayerModel:SetCreature (0x00597960, a `int __cdecl(lua_State*)` that the live model
 // never uses normally) — and overload it with a SENTINEL argument range. When the addon
 // calls model:SetCreature(PREVIEW_BASE + itemId) we run the engine's own C try-on on that
-// exact model object and skip the real SetCreature; any normal SetCreature call passes
-// straight through. This needs no in-range thunk and uses the same Detours technique the
-// rest of the DLL already relies on.
+// exact model object and skip the real SetCreature. The slot-encoded range is used by
+// the addon for weapons, so off-hand/main-hand/ranged preview never depends on the
+// engine's auto-slot guess. Any normal SetCreature call passes straight through. This
+// needs no in-range thunk and uses the same Detours technique the rest of the DLL uses.
 typedef void (__cdecl* lua_rawgeti_fn)(void* L, int idx, int n);
 typedef void* (__cdecl* lua_touserdata_fn)(void* L, int idx);
 typedef void (__thiscall* Model_TryOn_fn)(void* model, int itemId, int a2, int a3);
@@ -706,8 +707,10 @@ static void* g_o_SetCreatureLua = (void*)0x00597960;   // patched to the trampol
 
 // Sentinel arg range carried through SetCreature (well above any real CreatureDisplayInfo id,
 // well within exact double precision). Kept in sync with DressingRoom.lua.
-static const unsigned PREVIEW_BASE    = 0x10000000u;   // SetCreature(PREVIEW_BASE+itemId) -> try on itemId
-static const unsigned PREVIEW_UNDRESS = 0x1FFFFFFFu;   // SetCreature(PREVIEW_UNDRESS)     -> undress
+static const unsigned PREVIEW_BASE      = 0x10000000u; // SetCreature(PREVIEW_BASE+itemId) -> try on itemId, auto slot
+static const unsigned PREVIEW_SLOT_BASE = 0x18000000u; // + slot*stride + itemId -> forced slot try-on
+static const unsigned PREVIEW_SLOT_STRIDE = 0x00100000u;
+static const unsigned PREVIEW_UNDRESS   = 0x1FFFFFFFu; // SetCreature(PREVIEW_UNDRESS)     -> undress
 
 // Resolve the C model object behind the Lua model widget at stack index `idx`. Mirrors the
 // engine's own getter (0x4A81D5): rawgeti(L,idx,0) pushes widgetTable[0] (the object
@@ -731,10 +734,26 @@ static int __cdecl hk_SetCreatureLua(void* L) {
         if (g_setCreatureDiag < 40) { g_setCreatureDiag++; Log("[PREVIEW] SetCreature arg=%u (sentinel=%d)", v, (int)(v >= PREVIEW_BASE && v <= PREVIEW_UNDRESS)); }
         if (v >= PREVIEW_BASE && v <= PREVIEW_UNDRESS) {
             void* model = PreviewModelObjectAt(L, 1);
-            Log("[PREVIEW] sentinel hit: model=%p itemId=%d", model, (v == PREVIEW_UNDRESS) ? -1 : (int)(v - PREVIEW_BASE));
+            int logItemId = -1;
+            int logSlotId = -1;
+            if (v != PREVIEW_UNDRESS) {
+                if (v >= PREVIEW_SLOT_BASE) {
+                    const unsigned packed = v - PREVIEW_SLOT_BASE;
+                    logSlotId = (int)(packed / PREVIEW_SLOT_STRIDE);
+                    logItemId = (int)(packed % PREVIEW_SLOT_STRIDE);
+                } else {
+                    logItemId = (int)(v - PREVIEW_BASE);
+                }
+            }
+            Log("[PREVIEW] sentinel hit: model=%p itemId=%d slot=%d", model, logItemId, logSlotId);
             if (model) {
                 if (v == PREVIEW_UNDRESS) {
                     SC_Model_Undress(model);
+                } else if (v >= PREVIEW_SLOT_BASE) {
+                    const unsigned packed = v - PREVIEW_SLOT_BASE;
+                    const int slotId = (int)(packed / PREVIEW_SLOT_STRIDE);
+                    const int itemId = (int)(packed % PREVIEW_SLOT_STRIDE);
+                    if (itemId > 0) SC_Model_TryOn(model, itemId, 0, slotId);
                 } else {
                     const int itemId = (int)(v - PREVIEW_BASE);
                     if (itemId > 0) SC_Model_TryOn(model, itemId, 0, -1);

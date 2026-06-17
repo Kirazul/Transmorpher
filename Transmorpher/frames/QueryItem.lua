@@ -8,18 +8,22 @@ local tooltip = CreateFrame("GameTooltip", nil, UIParent)
 local dummy = CreateFrame("Frame", nil, UIParent)
 dummy.queries = {} -- [itemId] = {functable1, functable2, fuctable3, ...}
 dummy.elapsed = 0.0
+dummy.toRemove = {}
 
 
 local function dummy_OnUpdate(self, elapsed)
     self.elapsed = self.elapsed + elapsed
     if self.elapsed >= PERIOD then
-        local onRemove = {}
+        local step = self.elapsed
+        self.elapsed = 0
+        local onRemove = self.toRemove
+        wipe(onRemove)
         for itemId, handlers in pairs(self.queries) do
             local itemName, itemLink = GetItemInfo(itemId)
             local i = #handlers
             while i >= 1 do
                 local h = handlers[i]
-                h.time = h.time - elapsed
+                h.time = h.time - step
                 if itemLink ~= nil or h.time <= 0 then
                     h(itemId, itemLink ~= nil)
                     table.remove(handlers, i)

@@ -7,10 +7,11 @@ local itemBackdrop = { -- small "DressingRoom"s
 	tile = true, tileSize = 16, edgeSize = 16,
     insets = { left = 3, right = 3, top = 3, bottom = 3 }
 }
-local itemBackdropColor = {0.10, 0.09, 0.08, 1}
-local itemBackdropBorderColor = {0.45, 0.38, 0.28}
-local selectedItemBackdropBorderColor = {0.96, 0.78, 0.26}
+local itemBackdropColor = {0.055, 0.045, 0.032, 0.98}
+local itemBackdropBorderColor = {0.62, 0.48, 0.18, 0.9}
+local selectedItemBackdropBorderColor = {1.00, 0.82, 0.24, 1.00}
 local previewHighlightTexture = "Interface\\Buttons\\ButtonHilight-Square"
+local MIN_ITEM_PREVIEW_ROWS = 3
 
 
 local function getIndexOf(array, value)
@@ -37,6 +38,31 @@ end
 
 local function DressingRoom_OnUpdateModel(self)
     self:SetSequence(self:GetParent():GetParent().dressingRoomSetup.sequence)
+end
+
+local function MakeSetupKey(width, height, x, y, z, facing, sequence)
+    return tostring(width or 0) .. ":" .. tostring(height or 0) .. ":" .. tostring(x or 0) .. ":" .. tostring(y or 0) .. ":" .. tostring(z or 0) .. ":" .. tostring(facing or 0) .. ":" .. tostring(sequence or 0)
+end
+
+local function MakeRenderKey(self, itemId)
+    return (self.setupKey or "") .. ":" .. tostring(self.itemsVersion or 0) .. ":" .. tostring(itemId or "") .. ":" .. tostring(self.tryOnItem or "") .. ":" .. tostring(self.previewSlotName or "")
+end
+
+local function UpdateSelectionBorder(self, dr)
+    if dr.itemId == self.selectedItemId then
+        dr:SetBackdropBorderColor(unpack(selectedItemBackdropBorderColor))
+    else
+        dr:SetBackdropBorderColor(unpack(itemBackdropBorderColor))
+    end
+end
+
+local function InvalidateRenderedItems(self)
+    self.itemsVersion = (self.itemsVersion or 0) + 1
+    for _, dr in ipairs(self.dressingRooms) do
+        dr.renderKey = nil
+        dr.pendingRenderKey = nil
+        dr.isQuerying = false
+    end
 end
 
 
@@ -134,6 +160,8 @@ local recycler = {
             assert(dr ~= v, "Double recycling.")
         end
         dr:ClearModel()
+        dr.renderKey = nil
+        dr.pendingRenderKey = nil
         dr:Hide()
         table.insert(recycled, dr)
     end,
@@ -141,10 +169,23 @@ local recycler = {
 
 
 local function PreviewList_SetItems(self, itemIds)
+    local wasCustom = self.customEntries ~= nil
     self.customEntries = nil
+    local changed = wasCustom or #self.itemIds ~= #itemIds
+    if not changed then
+        for i = 1, #itemIds do
+            if self.itemIds[i] ~= itemIds[i] then
+                changed = true
+                break
+            end
+        end
+    end
     table.wipe(self.itemIds)
     for i=1, #itemIds do
         table.insert(self.itemIds, itemIds[i])
+    end
+    if changed then
+        InvalidateRenderedItems(self)
     end
     self.selectedItemId = nil
     self.selectedItemIndex = nil
@@ -163,8 +204,18 @@ local function PreviewList_SetupModel(self, width, height, x, y, z, facing, sequ
         ["facing"] = facing,
         ["sequence"] = sequence,
     }
+    local setupKey = MakeSetupKey(width, height, x, y, z, facing, sequence)
+    if self.setupKey ~= setupKey then
+        self.setupKey = setupKey
+        for _, dr in ipairs(self.dressingRooms) do
+            dr.renderKey = nil
+            dr.pendingRenderKey = nil
+            dr.isQuerying = false
+        end
+    end
     local countW = math.max(1, math.floor(self:GetWidth() / width))
-    local countH = math.max(1, math.floor(self:GetHeight() / height))
+    local minRows = self.customEntries and 1 or (self.minRows or MIN_ITEM_PREVIEW_ROWS)
+    local countH = math.max(minRows, math.floor(self:GetHeight() / height))
     local perPage = countW * countH
     if perPage > 0 then
         if #self.dressingRooms < perPage then
@@ -189,9 +240,6 @@ local function PreviewList_SetupModel(self, width, height, x, y, z, facing, sequ
                 local dr = self.dressingRooms[(h - 1) * countW + w]
                 dr:ClearAllPoints()
                 dr:SetPoint("TOPLEFT", self, "TOPLEFT", width * (w - 1) + gapW , -height * (h - 1) - gapH)
-                dr.itemId = nil
-                dr.itemIndex = nil
-                dr.isQuerying = false
                 dr:SetSize(width, height)
                 dr:SetBackdropBorderColor(unpack(itemBackdropBorderColor))
             end
@@ -202,11 +250,7 @@ end
 local function PreviewList_GetItemIndex(self, sourceCount, slotIndex)
     local perPage = #self.dressingRooms
     if perPage <= 0 then return nil end
-    local pageCount = math.max(1, math.ceil(sourceCount / perPage))
     local page = self.currentPage or 1
-    if page >= pageCount and sourceCount > perPage then
-        return sourceCount - perPage + slotIndex
-    end
     return (page - 1) * perPage + slotIndex
 end
 
@@ -231,24 +275,35 @@ local function PreviewList_GetPageCount(self)
 end
 
 
+local function PreviewList_TryOnItem(dr, itemId, slotName)
+    if ns.TryOnPreviewItem then ns.TryOnPreviewItem(dr, itemId, slotName)
+    else dr:TryOn(itemId) end
+end
+
+local function PreviewList_RenderItem(dr, itemId, parent)
+    parent = parent or dr:GetParent()
+    dr:Reset()
+    dr:Undress()
+    local setup = parent.dressingRoomSetup
+    dr:SetPosition(setup.x, setup.y, setup.z)
+    dr:SetFacing(setup.facing)
+    PreviewList_TryOnItem(dr, itemId, parent.previewSlotName)
+    if parent.tryOnItem ~= nil then
+        PreviewList_TryOnItem(dr, parent.tryOnItem, parent.tryOnItemSlotName or parent.previewSlotName)
+    end
+    dr:SetSequence(setup.sequence)
+    dr.button:Show()
+    dr:OnUpdateModel(DressingRoom_OnUpdateModel)
+    dr.renderKey = MakeRenderKey(parent, itemId)
+end
+
 local function queryItemHandler(functable, itemId, success)
     local dr = functable.dressingRoom
     if dr.itemId == itemId then
         dr.queriedLabel:Hide()
         dr.isQuerying = false
         if success then
-            dr.queriedLabel:Hide()
-            dr:Reset()
-            dr:Undress()
-            local setup = dr:GetParent().dressingRoomSetup
-            dr:SetPosition(setup.x, setup.y, setup.z)
-            dr:SetFacing(setup.facing)
-            dr:TryOn(itemId)
-            if dr:GetParent().tryOnItem ~= nil then
-                dr:TryOn(dr:GetParent().tryOnItem)
-            end
-            dr.button:Show()
-            dr:OnUpdateModel(DressingRoom_OnUpdateModel)
+            PreviewList_RenderItem(dr, itemId)
         else
             dr.queryFailedLabel:Show()
         end
@@ -286,11 +341,7 @@ local function PreviewList_Update(self)
                 if self.customRenderer then
                     self.customRenderer(dr, entry, self)
                 end
-                if dr.itemId == self.selectedItemId then
-                    dr:SetBackdropBorderColor(unpack(selectedItemBackdropBorderColor))
-                else
-                    dr:SetBackdropBorderColor(unpack(itemBackdropBorderColor))
-                end
+                UpdateSelectionBorder(self, dr)
             end
         end
         return
@@ -300,6 +351,8 @@ local function PreviewList_Update(self)
         for _, dr in ipairs(self.dressingRooms) do
             dr:OnUpdateModel(nil)
             dr:ClearModel()
+            dr.renderKey = nil
+            dr.pendingRenderKey = nil
             dr:Hide()
         end
         return
@@ -318,7 +371,10 @@ local function PreviewList_Update(self)
             dr.itemIndex = itemIndex
             dr.isQuerying = true
             dr:Show()
+            dr:OnUpdateModel(nil)
             dr:ClearModel()
+            dr.renderKey = nil
+            dr.pendingRenderKey = nil
             dr.button:Hide()
             dr.queriedLabel:Show()
             dr.queryFailedLabel:Hide()
@@ -327,11 +383,7 @@ local function PreviewList_Update(self)
                 ["__call"] = queryItemHandler,}
             setmetatable(handler, handler)
             ns.QueryItem(itemId, handler)
-            if dr.itemId == self.selectedItemId then
-                dr:SetBackdropBorderColor(unpack(selectedItemBackdropBorderColor))
-            else
-                dr:SetBackdropBorderColor(unpack(itemBackdropBorderColor))
-            end
+            UpdateSelectionBorder(self, dr)
         end
     end
 end
@@ -365,11 +417,18 @@ end
 
 
 local function PreviewList_TryOn(self, item)
+    local changed = self.tryOnItem ~= item
     self.tryOnItem = item
+    if changed then
+        for _, dr in ipairs(self.dressingRooms) do
+            dr.renderKey = nil
+            dr.pendingRenderKey = nil
+        end
+    end
     if item ~= nil then
         for i, dr in ipairs(self.dressingRooms) do
             if dr:IsVisible() and not dr.isQuerying then
-                dr:TryOn(item)
+                PreviewList_TryOnItem(dr, item, self.tryOnItemSlotName or self.previewSlotName)
             end
         end
     end
@@ -377,10 +436,14 @@ end
 
 local function PreviewList_SetCustomEntries(self, entries)
     table.wipe(self.itemIds)
+    local changed = self.customEntries ~= entries
     if entries then
         self.customEntries = entries
     else
         self.customEntries = nil
+    end
+    if changed then
+        InvalidateRenderedItems(self)
     end
     self.selectedItemId = nil
     self.selectedItemIndex = nil
@@ -388,6 +451,7 @@ end
 
 local function PreviewList_SetCustomRenderer(self, renderer)
     self.customRenderer = renderer
+    self.customRendererVersion = (self.customRendererVersion or 0) + 1
 end
 
 
@@ -397,9 +461,12 @@ function ns.CreatePreviewList(parent)
     frame.itemIds = {}
     frame.dressingRooms = {}
     frame.currentPage = 1
+    frame.itemsVersion = 0
     frame.dressingRoomSetup = nil
     frame.customEntries = nil
     frame.customRenderer = nil
+    frame.customRendererVersion = 0
+    frame.minRows = MIN_ITEM_PREVIEW_ROWS
     frame.onEnter = nil
     frame.onLeave = nil
     frame.onItemClick = nil

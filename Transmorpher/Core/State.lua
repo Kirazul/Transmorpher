@@ -556,130 +556,84 @@ function ns.RunAfter(delay, fn)
     _runAfterJobs[#_runAfterJobs + 1] = { at = GetTime() + (tonumber(delay) or 0), fn = fn }
 end
 
+-- Change counters for non-slot state that affects the preview model.
+-- Bumped by ns.NotifyDressingRoomChanged(); included in the sync dedup key
+-- so SyncDressingRoom never skips the rebuild after a barber/skin change.
+ns._barberChangeSeq = 0
+ns._skinChangeSeq   = 0
+
+-- Central notification for any change that requires a dressing-room rebuild.
+-- Bumps the relevant counter (so the dedup key changes) and schedules ONE
+-- debounced sync.  Multiple rapid calls (e.g. slider dragging) coalesce into
+-- a single rebuild — no flicker, no redundant work.
+function ns.NotifyDressingRoomChanged(source, delay)
+    if source == "barber" then
+        ns._barberChangeSeq = (ns._barberChangeSeq or 0) + 1
+    elseif source == "skin" then
+        ns._skinChangeSeq = (ns._skinChangeSeq or 0) + 1
+    end
+    ns.ScheduleDressingRoomSync(delay or 0.08)
+end
+
 function ns.ScheduleDressingRoomSync(delay)
     local d = (type(delay) == "number" and delay >= 0) and delay or 0.05
-    if ns._dressingRoomSyncScheduled then return end
-    ns._dressingRoomSyncScheduled = true
-    if C_Timer and C_Timer.After then
-        C_Timer.After(d, function()
+    if not ns._drSyncFrame then
+        ns._drSyncFrame = CreateFrame("Frame"); ns._drSyncFrame:Hide(); ns._drSyncFrame.targetAt = 0
+        ns._drSyncFrame:SetScript("OnUpdate", function(self)
+            if GetTime() < (self.targetAt or 0) then return end
+            self:Hide()
             ns._dressingRoomSyncScheduled = false
             if ns.SyncDressingRoom then ns.SyncDressingRoom() end
         end)
-    else
-        if not ns._drSyncFrame then
-            ns._drSyncFrame = CreateFrame("Frame"); ns._drSyncFrame:Hide(); ns._drSyncFrame.elapsed = 0
-        end
-        ns._drSyncFrame.elapsed = 0
-        ns._drSyncFrame:SetScript("OnUpdate", function(self, dt)
-            self.elapsed = self.elapsed + dt
-            if self.elapsed < d then return end
-            self:Hide(); self:SetScript("OnUpdate", nil)
-            ns._dressingRoomSyncScheduled = false
-            if ns.SyncDressingRoom then ns.SyncDressingRoom() end
-        end)
-        ns._drSyncFrame:Show()
     end
+    ns._dressingRoomSyncScheduled = true
+    ns._drSyncFrame.targetAt = GetTime() + d
+    ns._drSyncFrame:Show()
 end
 
 function ns.SyncDressingRoom()
     local mainFrame = ns.mainFrame
     if not mainFrame or not mainFrame.dressingRoom or not mainFrame.slots then return end
-    -- Keep the eye (show/hide) icons in sync with the current state — they go stale
-    -- after sets/loadouts/restore unless re-derived here (this is the chokepoint
-    -- every slot change funnels through).
+    local room = mainFrame.dressingRoom
+    room.suppressSyncUntil = nil
+    room.forceNextSync = nil
+    room.lastSyncKey = nil
+
     if ns.RefreshAllEyeButtons then ns.RefreshAllEyeButtons() end
-    ns._dressingRoomSyncToken = (ns._dressingRoomSyncToken or 0) + 1
-    local syncToken = ns._dressingRoomSyncToken
-    mainFrame.dressingRoom:SetLight(1, 0, 0, 1, 0, 1, 0.7, 0.7, 0.7, 1, 0.8, 0.8, 0.64)
-    -- LIVE MIRROR: the Character Preview is the real character. Don't dress a hidden
-    -- preview model — just re-stamp the live unit so it shows exactly what's equipped/
-    -- morphed right now. (Item/set/loadout previews use their own separate models.)
-    if mainFrame.dressingRoom.IsLiveUnitModel and mainFrame.dressingRoom:IsLiveUnitModel() then
-        mainFrame.dressingRoom:SetModelAlpha(1)
-        if mainFrame.dressingRoom.RefreshLiveUnit then mainFrame.dressingRoom:RefreshLiveUnit() end
-        ns.UpdateSpecialSlots()
-        return
-    end
-    mainFrame.dressingRoom:SetModelAlpha(0)
-    -- Re-base the try-on model each rebuild: to the active MORPH creature display when the
-    -- player is morphed (so the preview matches their morphed look), otherwise to the real
-    -- player (race/skin/barber/equipped). Alpha is 0 here and revealed once items resolve, so
-    -- the re-base never flickers. Items are then tried on top (faked — no server morph).
-    local morphDisplay = TransmorpherCharacterState and tonumber(TransmorpherCharacterState.Morph)
-    if morphDisplay and morphDisplay > 0 then
-        mainFrame.dressingRoom:SetDisplayInfo(morphDisplay)
-    else
-        mainFrame.dressingRoom:SetUnit("player")
-    end
-    mainFrame.dressingRoom:Undress()
+    room:SetModelAlpha(1)
+    if room.SetLight then room:SetLight(1, 0, 0, 1, 0, 1, 0.7, 0.7, 0.7, 1, 0.8, 0.8, 0.64) end
+
+    -- DressMe-style rebuild: the Character Preview is just a DressUpModel based on
+    -- player, stripped, then dressed from the slot buttons exactly as the UI shows.
+    if room.Reset then room:Reset() elseif room.SetUnit then room:SetUnit("player") end
+    if room.Undress then room:Undress() end
 
     local hasMainHand = mainFrame.slots["Main Hand"] and mainFrame.slots["Main Hand"].itemId
         and mainFrame.slots["Main Hand"].itemId > 0 and not mainFrame.slots["Main Hand"].isHiddenSlot
     local hasOffHand = mainFrame.slots["Off-hand"] and mainFrame.slots["Off-hand"].itemId
         and mainFrame.slots["Off-hand"].itemId > 0 and not mainFrame.slots["Off-hand"].isHiddenSlot
-    local pendingAsync = 0
-    local revealed = false
-    local function Reveal()
-        if revealed then return end
-        revealed = true
-        if ns._dressingRoomSyncToken ~= syncToken then return end
-        if not mainFrame or not mainFrame.dressingRoom then return end
-        mainFrame.dressingRoom:SetModelAlpha(1)
+
+    local mhSlot, ohSlot, rangedSlotRef
+    local function TrySlot(slot)
+        if not slot or not slot.itemId or slot.itemId <= 0 or slot.isHiddenSlot then return end
+        if ns.TryOnPreviewItem then ns.TryOnPreviewItem(room, slot.itemId, slot.slotName)
+        elseif room.TryOn then room:TryOn(slot.itemId) end
     end
 
-    -- Build the dress order. WEAPONS MUST BE TRIED ON LAST, and in the order
-    -- off-hand THEN main-hand (the exact order the Loadout preview uses and that
-    -- works perfectly): the model attaches a 1H weapon to the main hand, so trying
-    -- the main-hand weapon LAST makes it win that slot instead of an off-hand 1H
-    -- weapon overwriting it ("shows on both hands / wrong hand"). Ranged (bow) is
-    -- only shown when no melee weapon is present.
-    local dressOrder = {}
-    local mhSlot, ohSlot, rangedSlotRef
-    for _, slotName in ipairs(ns.slotOrder) do
+    for _, slotName in ipairs(ns.slotOrder or {}) do
         local slot = mainFrame.slots[slotName]
         if slot and slot.itemId and slot.itemId > 0 and not slot.isHiddenSlot then
             if slotName == "Main Hand" then mhSlot = slot
             elseif slotName == "Off-hand" then ohSlot = slot
             elseif slotName == "Ranged" then rangedSlotRef = slot
-            else dressOrder[#dressOrder + 1] = slot end
+            else TrySlot(slot) end
         end
     end
-    if ohSlot then dressOrder[#dressOrder + 1] = ohSlot end          -- off-hand before
-    if mhSlot then dressOrder[#dressOrder + 1] = mhSlot end          -- main-hand LAST
-    if rangedSlotRef and not hasMainHand and not hasOffHand then     -- bow only w/o melee
-        dressOrder[#dressOrder + 1] = rangedSlotRef
-    end
+    if ohSlot then TrySlot(ohSlot) end
+    if mhSlot then TrySlot(mhSlot) end
+    if rangedSlotRef and not hasMainHand and not hasOffHand then TrySlot(rangedSlotRef) end
 
-    for _, slot in ipairs(dressOrder) do
-        local expectedId = slot.itemId
-        local slotRef = slot
-        mainFrame.dressingRoom:TryOn(expectedId)
-        pendingAsync = pendingAsync + 1
-        ns.QueryItem(expectedId, function(queriedItemId, success)
-            if ns._dressingRoomSyncToken == syncToken then
-                if success and queriedItemId == expectedId and slotRef and slotRef.itemId == expectedId and mainFrame and mainFrame.dressingRoom then
-                    mainFrame.dressingRoom:TryOn(queriedItemId)
-                end
-                pendingAsync = pendingAsync - 1
-                if pendingAsync <= 0 then
-                    Reveal()
-                end
-            end
-        end)
-    end
-
-    ns.UpdateSpecialSlots()
-    -- Reveal as soon as all items resolve (snappy). But ALWAYS guarantee a reveal
-    -- via a frame timer too, so the model can never get stuck invisible if an item
-    -- query hangs or never fires (the old code relied on C_Timer, which does not
-    -- exist on 3.3.5a -> the model stayed invisible). Reveal() is idempotent and
-    -- token-guarded, so the earliest of the two wins and stale syncs are ignored.
-    if pendingAsync <= 0 then
-        Reveal()
-    else
-        ns.RunAfter(0.15, Reveal)   -- primary guaranteed reveal
-        ns.RunAfter(0.60, Reveal)   -- hard safety net for slow/failed item queries
-    end
+    if ns.UpdateSpecialSlots then ns.UpdateSpecialSlots() end
 end
 
 -- ============================================================

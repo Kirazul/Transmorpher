@@ -124,81 +124,51 @@ local function Send(cmd)
     return false
 end
 
-local function QueueCommand(cmd, queue)
-    if queue then queue[#queue + 1] = cmd; return true end
-    return Send(cmd)
-end
+local function QueryMaxes() Send(("BARBER_GET:%d:%d"):format(myRace, mySex)) end
 
-local function FlushCommands(queue)
-    if not queue or #queue == 0 then return false end
-    return Send(table.concat(queue, "|"))
-end
-
-local function RefreshPreview(delay)
-    if ns.QueueCharacterPreviewSync then
-        ns.QueueCharacterPreviewSync(delay or 0.18)
-    elseif ns.ScheduleDressingRoomSync then
-        ns.ScheduleDressingRoomSync(delay or 0.18)
-    end
-end
-
-local function QueryMaxes(queue)
-    return QueueCommand(("BARBER_GET:%d:%d"):format(myRace, mySex), queue)
-end
-
-local function PushBarber(queue)
+local function PushBarber()
     local b = S()
-    return QueueCommand(("BARBER:%d:%d:%d:%d:%d"):format(b.skin, b.face, b.hair, b.haircolor, b.facial), queue)
+    return Send(("BARBER:%d:%d:%d:%d:%d"):format(b.skin, b.face, b.hair, b.haircolor, b.facial))
 end
 
 -- Send (or clear) ONE texture region using an explicit record. Always sends the
 -- CURRENT discrete indices so the DLL binds the tint to the texture the region is
 -- actually showing.
-local function SendOneRegion(region, t, queue)
+local function SendOneRegion(region, t)
     local b = S()
-    if not (t and t.enabled) then return QueueCommand("BARBER_TINT_OFF:" .. region, queue) end
+    if not (t and t.enabled) then Send("BARBER_TINT_OFF:" .. region); return end
     t = NormalizeTint(t)
-    return QueueCommand(("BARBER_TINT:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d"):format(
+    Send(("BARBER_TINT:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d"):format(
         region, myRace, mySex, b.skin, b.face, b.hair, b.haircolor, b.facial,
         t.mode, t.r, t.g, t.b, t.r2, t.g2, t.b2, t.dir, t.mult, t.glowStr,
-        t.contrast, t.span, t.phase, t.brightness, t.saturation, t.hueShift), queue)
+        t.contrast, t.span, t.phase, t.brightness, t.saturation, t.hueShift))
 end
 
 -- Push the colour stored at `primary` to every region in its group (or clear them all).
-local function SendTintGroup(primary, queue)
+local function SendTintGroup(primary)
     local regions = TINT_GROUPS[primary]
-    if not regions then return false end
+    if not regions then return end
     local t = S().tint[primary]
-    local out = queue or {}
-    local sent = false
-    for _, region in ipairs(regions) do sent = SendOneRegion(region, t, out) or sent end
-    if not queue and sent then return FlushCommands(out) end
-    return sent
+    for _, region in ipairs(regions) do SendOneRegion(region, t) end
 end
 
 -- Re-send every active colour group (after a discrete change re-binds the texture).
-local function ResendActiveRegionTints(queue)
+local function ResendActiveRegionTints()
     local b = S()
-    local out = queue or {}
-    local sent = false
     for primary in pairs(TINT_GROUPS) do
         local t = b.tint[primary]
-        if t and t.enabled then sent = SendTintGroup(primary, out) or sent end
+        if t and t.enabled then SendTintGroup(primary) end
     end
-    if not queue and sent then return FlushCommands(out) end
-    return sent
 end
 
 -- Re-send the saved barber look on login / DLL-ready.
 function ns.Barber_ApplyAll()
     local b = S()
-    local q = {}
-    if b.active then PushBarber(q) end
+    if b.active then PushBarber() end
     for primary in pairs(TINT_GROUPS) do
         local t = b.tint[primary]
-        if t and t.enabled then SendTintGroup(primary, q) end
+        if t and t.enabled then SendTintGroup(primary) end
     end
-    if FlushCommands(q) then RefreshPreview(0.25) end
 end
 
 local function BarberTabFrame()
@@ -214,11 +184,10 @@ function ns.Barber_Reset(silent)
     b.haircolor = b.base.haircolor or b.haircolor or 0
     b.facial    = b.base.facial    or b.facial    or 0
     b.tint = {}
-    local q = {}
-    QueueCommand("BARBER_OFF", q)
-    QueueCommand("BARBER_TINT_CLEAR", q)
-    QueryMaxes(q)
-    if FlushCommands(q) then RefreshPreview(0.18) end
+    Send("BARBER_OFF")
+    Send("BARBER_TINT_CLEAR")
+    QueryMaxes()
+    if ns.NotifyDressingRoomChanged then ns.NotifyDressingRoomChanged("barber", 0.20) end
     local t = BarberTabFrame()
     if t and t.RefreshBarber then t.RefreshBarber() end
     if not silent and ns.EnhPrint then ns.EnhPrint("Restored your original appearance.") end
@@ -493,13 +462,12 @@ function ns.InitBarberTab(parent)
     scroll:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -6); scroll:SetPoint("BOTTOMRIGHT", -26, 10)
     local content = CreateFrame("Frame", nil, scroll); content:SetSize(10, 10); scroll:SetScrollChild(content)
 
-    local function ApplyChange(card, pendingCommands)
+    local function ApplyChange(card)
         b.active = true
-        local q = pendingCommands or {}
-        PushBarber(q)
-        QueryMaxes(q)                -- refresh context-sensitive valid DBC values
-        ResendActiveRegionTints(q)   -- texture changed -> re-bind any region tints
-        if FlushCommands(q) then RefreshPreview(0.18) end
+        PushBarber()
+        QueryMaxes()              -- refresh context-sensitive valid DBC values
+        ResendActiveRegionTints()   -- texture changed -> re-bind any region tints
+        if ns.NotifyDressingRoomChanged then ns.NotifyDressingRoomChanged("barber", 0.20) end
         if card then RefreshCard(card) end
         PlaySound("gsTitleOptionOK")
     end
@@ -658,18 +626,16 @@ function ns.InitBarberTab(parent)
         cardResetBtn:Hide(); card.cardResetBtn = cardResetBtn
         cardResetBtn:SetScript("OnClick", function()
             b[cat.key] = BaseVal(cat.key)
-            local q
             if cat.colorRegions then
                 local primary = PrimaryRegionFor(cat)
                 b.tint[primary] = nil
-                q = {}
-                SendTintGroup(primary, q)   -- sends BARBER_TINT_OFF to every region in the group
+                SendTintGroup(primary)   -- sends BARBER_TINT_OFF to every region in the group
             end
             local anyChanged = false
             for _, c in ipairs(CATS) do if Val(c.key) ~= BaseVal(c.key) then anyChanged = true; break end end
             local anyTint = false
             for _, t in pairs(b.tint) do if t and t.enabled then anyTint = true; break end end
-            if anyChanged or anyTint then ApplyChange(card, q) else ns.Barber_Reset(true) end
+            if anyChanged or anyTint then ApplyChange(card) else ns.Barber_Reset(true) end
             RefreshAll(); PlaySound("gsTitleOptionOK")
         end)
 
@@ -696,7 +662,8 @@ function ns.InitBarberTab(parent)
         local function T() return f.region and RegionRec(f.region, f.cat) or nil end
         local function Commit()
             if not f.region then return end
-            if SendTintGroup(f.region) then RefreshPreview(0.12) end   -- f.region is the group's primary; pushes to all its regions
+            SendTintGroup(f.region)   -- f.region is the group's primary; pushes to all its regions
+            if ns.NotifyDressingRoomChanged then ns.NotifyDressingRoomChanged("barber", 0.20) end
             if f.card then RefreshCard(f.card) end
             if f.Refresh then f.Refresh() end
         end
@@ -770,7 +737,8 @@ function ns.InitBarberTab(parent)
         rb:SetScript("OnClick", function()
             if not f.region then return end
             b.tint[f.region] = nil
-            if SendTintGroup(f.region) then RefreshPreview(0.12) end
+            SendTintGroup(f.region)
+            if ns.NotifyDressingRoomChanged then ns.NotifyDressingRoomChanged("barber", 0.20) end
             if f.card then RefreshCard(f.card) end
             if f.Refresh then f.Refresh() end
         end)
@@ -827,10 +795,8 @@ function ns.InitBarberTab(parent)
             if cat.colorRegions then b.tint[PrimaryRegionFor(cat)] = RandomTintFor(cat, palette) end
         end
         b.active = true
-        local q = {}
-        PushBarber(q); QueryMaxes(q); ResendActiveRegionTints(q)
-        if FlushCommands(q) then RefreshPreview(0.18) end
-        RefreshAll()
+        PushBarber(); QueryMaxes(); ResendActiveRegionTints(); RefreshAll()
+        if ns.NotifyDressingRoomChanged then ns.NotifyDressingRoomChanged("barber", 0.20) end
         PlaySound("gsTitleOptionOK")
     end)
     resetBtn:SetScript("OnClick", function()

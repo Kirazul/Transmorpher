@@ -444,20 +444,34 @@ function ns.InitSetsTab(parent)
         end
 
         local currentSet = selectedSet
-        for _, item in ipairs(selectedSet.items) do
-            if item.slot ~= "Main Hand" and item.slot ~= "Off-hand" and item.slot ~= "Ranged" then
-                local itemId = item.itemId
-                if GetItemInfo(itemId) then
-                    model:TryOn(itemId)
-                else
-                    ns.QueryItem(itemId, function(qId, success)
-                        if success and selectedSet == currentSet then
-                            model:TryOn(qId)
-                        end
-                    end)
-                end
+        local mainHand, offHand, ranged
+        local function TrySetItem(itemId, slotName)
+            if ns.TryOnPreviewItem then ns.TryOnPreviewItem(model, itemId, slotName)
+            else model:TryOn(itemId) end
+        end
+        local function TryOrQuery(itemId, slotName)
+            if GetItemInfo(itemId) then
+                TrySetItem(itemId, slotName)
+            else
+                ns.QueryItem(itemId, function(qId, success)
+                    if success and selectedSet == currentSet then
+                        TrySetItem(qId, slotName)
+                    end
+                end)
             end
         end
+        for _, item in ipairs(selectedSet.items) do
+            local itemId = item.itemId
+            if item.slot == "Main Hand" then mainHand = itemId
+            elseif item.slot == "Off-hand" then offHand = itemId
+            elseif item.slot == "Ranged" then ranged = itemId
+            else
+                TryOrQuery(itemId, item.slot)
+            end
+        end
+        if offHand then TryOrQuery(offHand, "Off-hand") end
+        if mainHand then TryOrQuery(mainHand, "Main Hand") end
+        if ranged and not mainHand and not offHand then TryOrQuery(ranged, "Ranged") end
     end
 
     SelectSet = function(setData)
@@ -597,8 +611,8 @@ function ns.InitSetsTab(parent)
             end
         end
         if mainFrame.buttons and mainFrame.buttons.applyAll then
-            -- Apply All ends its batch with a single REFRESH, so the set reliably
-            -- commits to the character with exactly one model rebuild.
+            -- Apply All sends only real descriptor changes; the DLL refreshes
+            -- components only if those descriptors actually changed.
             mainFrame.buttons.applyAll:Click()
         end
         print("|cffF5C842<Transmorpher>|r: Applied set " .. selectedSet.name)

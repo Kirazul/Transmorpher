@@ -50,7 +50,7 @@ ns.Colors = {
 -- ============================================================
 ns.Dimensions = {
     mainWidth   = 1045,
-    mainHeight  = 528,
+    mainHeight  = 584,
     tabHeight   = 30,
     slotSize    = 40,
     slotGap     = 3,
@@ -285,7 +285,7 @@ ns.defaultSettings = {
     showMinimapButton = true,
     hidePaperdollButton = false,
     windowWidth = 1045,
-    windowHeight = 528,
+    windowHeight = 584,
     -- Distance culling: make far objects "not exist" for FPS (never the local player).
     -- hidePlayersEnabled is the master switch; the rest pick what gets culled.
     hidePlayersEnabled       = false,   -- master

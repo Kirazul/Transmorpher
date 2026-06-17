@@ -96,7 +96,7 @@ mainFrame:SetScript("OnHide", function()
 end)
 
 -- ============================================================
--- MAIN FRAME BACKGROUND & BORDER (Retail Flat Style)
+-- MAIN FRAME BACKGROUND & BORDER (dark premium gold shell)
 -- ============================================================
 mainFrame:SetBackdrop({
     bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
@@ -104,8 +104,8 @@ mainFrame:SetBackdrop({
     tile = false, tileSize = 0, edgeSize = 2,
     insets = { left = 2, right = 2, top = 2, bottom = 2 }
 })
-mainFrame:SetBackdropColor(0.04, 0.04, 0.04, 0.98)
-mainFrame:SetBackdropBorderColor(0.55, 0.45, 0.15, 0.75)
+mainFrame:SetBackdropColor(0.035, 0.030, 0.024, 0.985)
+mainFrame:SetBackdropBorderColor(0.82, 0.62, 0.16, 0.95)
 
 -- Optional drop shadow (fake)
 local shadow = mainFrame:CreateTexture(nil, "BACKGROUND", nil, -1)
@@ -120,7 +120,7 @@ titleSep:SetTexture("Interface\\ChatFrame\\ChatFrameBackground")
 titleSep:SetPoint("TOPLEFT", 1, -30)
 titleSep:SetPoint("TOPRIGHT", -1, -30)
 titleSep:SetHeight(1)
-titleSep:SetVertexColor(0.2, 0.2, 0.2, 1)
+titleSep:SetVertexColor(0.58, 0.43, 0.12, 0.85)
 
 -- Main Vertical Separator (left side for preview, right side for tabs)
 local separatorV = mainFrame:CreateTexture(nil, "BORDER")
@@ -128,7 +128,14 @@ separatorV:SetTexture("Interface\\ChatFrame\\ChatFrameBackground")
 separatorV:SetPoint("TOPLEFT", 410, -30)
 separatorV:SetPoint("BOTTOMLEFT", 410, 8)
 separatorV:SetWidth(1)
-separatorV:SetVertexColor(0.2, 0.2, 0.2, 1)
+separatorV:SetVertexColor(0.52, 0.39, 0.12, 0.75)
+
+local topSheen = mainFrame:CreateTexture(nil, "BORDER")
+topSheen:SetTexture("Interface\\Buttons\\WHITE8x8")
+topSheen:SetPoint("TOPLEFT", 3, -3)
+topSheen:SetPoint("TOPRIGHT", -3, -3)
+topSheen:SetHeight(1)
+topSheen:SetVertexColor(1.0, 0.86, 0.36, 0.38)
 
 -- ============================================================
 -- TITLE BAR
@@ -153,8 +160,8 @@ stats:SetBackdrop({
     tile = false, tileSize = 0, edgeSize = 1,
     insets = { left = 0, right = 0, top = 0, bottom = 0 }
 })
-stats:SetBackdropColor(0.05, 0.05, 0.05, 0.95)
-stats:SetBackdropBorderColor(0.2, 0.2, 0.2, 1)
+stats:SetBackdropColor(0.045, 0.038, 0.028, 0.95)
+stats:SetBackdropBorderColor(0.48, 0.36, 0.12, 0.85)
 stats:SetPoint("BOTTOMLEFT", 415, 8)
 stats:SetPoint("BOTTOMRIGHT", -24, 8)
 stats:SetHeight(24)
@@ -304,15 +311,15 @@ do
         for i = 1, TAB_COUNT do
             local tabBtn = mainFrame.buttons["tab"..i]
             if i == selectedTabIdx then
-                tabBtn.bg:SetTexture(0.12, 0.10, 0.07, 1)
+                tabBtn.bg:SetTexture(0.13, 0.095, 0.035, 1)
                 tabBtn.topLine:Show()
                 tabBtn.botLine:Hide()
                 tabBtn:GetFontString():SetTextColor(0.96, 0.78, 0.26, 1)
             else
-                tabBtn.bg:SetTexture(0.06, 0.05, 0.04, 0.95)
+                tabBtn.bg:SetTexture(0.055, 0.045, 0.032, 0.95)
                 tabBtn.topLine:Hide()
                 tabBtn.botLine:Show()
-                tabBtn:GetFontString():SetTextColor(0.55, 0.50, 0.40, 1)
+                tabBtn:GetFontString():SetTextColor(0.62, 0.55, 0.40, 1)
             end
         end
     end
@@ -394,7 +401,7 @@ do
         end
 
         local bg = btn:CreateTexture(nil, "BACKGROUND")
-        bg:SetAllPoints(); bg:SetTexture(0.06, 0.05, 0.04, 0.95)
+        bg:SetAllPoints(); bg:SetTexture(0.055, 0.045, 0.032, 0.95)
         btn.bg = bg
 
         local topLine = btn:CreateTexture(nil, "OVERLAY")
@@ -406,14 +413,14 @@ do
         local botLine = btn:CreateTexture(nil, "OVERLAY")
         botLine:SetHeight(1)
         botLine:SetPoint("BOTTOMLEFT"); botLine:SetPoint("BOTTOMRIGHT")
-        botLine:SetTexture(0.35, 0.28, 0.14, 0.6)
+        botLine:SetTexture(0.48, 0.35, 0.12, 0.65)
         btn.botLine = botLine
 
         if i > 1 then
             local sep = btn:CreateTexture(nil, "OVERLAY")
             sep:SetWidth(1)
             sep:SetPoint("TOPLEFT", 0, -3); sep:SetPoint("BOTTOMLEFT", 0, 3)
-            sep:SetTexture(0.3, 0.25, 0.15, 0.4)
+            sep:SetTexture(0.48, 0.35, 0.12, 0.45)
         end
 
         local htex = btn:CreateTexture(nil, "HIGHLIGHT")
@@ -422,7 +429,7 @@ do
 
         local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         fs:SetPoint("CENTER"); fs:SetText(TAB_NAMES[i])
-        fs:SetTextColor(0.55, 0.50, 0.40, 1)
+        fs:SetTextColor(0.62, 0.55, 0.40, 1)
         btn:SetFontString(fs)
 
         btn:SetScript("OnClick", tab_OnClick)
@@ -435,7 +442,18 @@ do
     end
 
     LayoutMainTabs()
-    mainFrame:SetScript("OnSizeChanged", function()
+    local enforcingMinimumSize = false
+    mainFrame:SetScript("OnSizeChanged", function(self)
+        if enforcingMinimumSize then return end
+        local width = self:GetWidth() or MIN_MAIN_W
+        local height = self:GetHeight() or MIN_MAIN_H
+        local targetW = width < MIN_MAIN_W and MIN_MAIN_W or width
+        local targetH = height < MIN_MAIN_H and MIN_MAIN_H or height
+        if targetW ~= width or targetH ~= height then
+            enforcingMinimumSize = true
+            self:SetSize(targetW, targetH)
+            enforcingMinimumSize = false
+        end
         LayoutMainTabs()
         SaveMainFrameSize()
     end)

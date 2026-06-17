@@ -11,6 +11,47 @@ local xStep = 0.2 -- per pixel
 local zStep = 0.003 -- per pixel
 local facingStep = math.rad(0.75) -- per pixel
 
+-- Kept in sync with StealthMorpher/src/Utils.cpp preview sentinels.
+local PV_TRYON_BASE = 0x10000000
+local PV_TRYON_SLOT_BASE = 0x18000000
+local PV_TRYON_SLOT_STRIDE = 0x00100000
+local PV_UNDRESS = 0x1FFFFFFF
+
+local function GetForcedWeaponSlotId(slotName)
+    if slotName == ns.mainHandSlot or slotName == "Main Hand" then return 16 end
+    if slotName == ns.offHandSlot or slotName == "Off-hand" then return 17 end
+    if slotName == ns.rangedSlot or slotName == "Ranged" then return 18 end
+    return nil
+end
+
+local function CanUsePreviewSentinel(model)
+    return model and model.SetCreature and ns.IsMorpherReady and ns.IsMorpherReady()
+end
+
+function ns.TryOnPreviewItem(model, itemId, slotName)
+    itemId = tonumber(itemId)
+    if not model or not itemId or itemId <= 0 then return false end
+    local targetModel = model
+    if targetModel.GetModel and targetModel.liveUnitModel ~= nil then targetModel = targetModel:GetModel() end
+
+    local forcedSlot = GetForcedWeaponSlotId(slotName)
+    if forcedSlot and CanUsePreviewSentinel(targetModel) and itemId < PV_TRYON_SLOT_STRIDE then
+        targetModel:SetCreature(PV_TRYON_SLOT_BASE + forcedSlot * PV_TRYON_SLOT_STRIDE + itemId)
+        return true
+    end
+
+    if targetModel and targetModel.TryOn then
+        targetModel:TryOn(itemId)
+        return true
+    end
+
+    if CanUsePreviewSentinel(targetModel) then
+        targetModel:SetCreature(PV_TRYON_BASE + itemId)
+        return true
+    end
+    return false
+end
+
 local sex = {male = 2, female = 3}
 sex[sex.male] = "male"
 sex[sex.female] = "female"
@@ -81,15 +122,9 @@ local modelZ = {
 
 -- ============================================================
 -- DRESSING ROOM
--- The main "Character Preview" is a LIVE mirror of your real in-game character.
--- Pass { liveUnitModel = true } to make the room a single PlayerModel bound to
--- the player: it shows exactly what the game shows (gear, morphs, forms) and is
--- re-stamped on the relevant events. In that mode TryOn/Undress do NOT preview
--- gear on this model — they just refresh the live unit, so the preview can never
--- drift away from the real character. Item/set/loadout *previews* use their own
--- separate DressUpModels (see ns.DressPreviewModel below), keeping the old
--- preview behaviour exactly where it belongs.
--- Without the flag the room behaves as a classic DressUpModel try-on room.
+-- Default path matches DressMe: a plain DressUpModel based on player, with TryOn
+-- and Undress applied directly. liveUnitModel remains only for callers that
+-- explicitly request it; Transmorpher's main Character Preview does not.
 -- ============================================================
 function ns.CreateDressingRoom(name, parent, opts)
     local frame = CreateFrame("Frame", name, parent)
@@ -128,50 +163,36 @@ function ns.CreateDressingRoom(name, parent, opts)
         return self.liveUnitModel and true or false
     end
 
-    -- Re-stamp the model so it matches the current slot state.
-    -- When a preview is active re-applies it so items stay visible.
+    -- Re-stamp the live model so it matches the real character right now.
+    -- While a FAKED preview is active (item try-on / undress driven purely client-side),
+    -- re-stamping would wipe it, so we re-apply the preview instead — this keeps a tried-on
+    -- item visible across the equipment/model events that fire while browsing.
     function frame:RefreshLiveUnit()
-        if self.liveUnitModel then
-            if self.previewActive then
-                if self.previewUndressed then self:PreviewUndressFaked() else self:PreviewApplyItems() end
-                return
-            end
-            model:ClearModel()
-            model:SetUnit(unit or "player")
+        if not self.liveUnitModel then return end
+        if self.previewActive then
+            if self.previewUndressed then self:PreviewUndressFaked() else self:PreviewApplyItems() end
             return
         end
-        -- DressUpModel path: rebuild from slot items (no-op while preview is active,
-        -- since PreviewApplyItems will be called through the queued refresh path).
-        if not self.previewActive then
-            model:SetUnit("player")
-            model:Undress()
-            local items = ns.BuildPreviewSlotItems and ns.BuildPreviewSlotItems() or {}
-            local mainHand, offHand, ranged
-            for _, slotName in ipairs(ns.slotOrder or {}) do
-                local id = items[slotName]
-                if id and id > 0 then
-                    if slotName == ns.mainHandSlot or slotName == "Main Hand" then mainHand = id
-                    elseif slotName == ns.offHandSlot or slotName == "Off-hand" then offHand = id
-                    elseif slotName == ns.rangedSlot or slotName == "Ranged" then ranged = id
-                    else model:TryOn(id) end
-                end
-            end
-            if offHand then model:TryOn(offHand) end
-            if mainHand then model:TryOn(mainHand) end
-            if ranged and not mainHand and not offHand then model:TryOn(ranged) end
-        end
+        model:ClearModel()
+        model:SetUnit(unit or "player")
     end
 
-    -- Client-side preview: show the currently-selected slot items on the model with
-    -- no server morph and no sync. Uses the standard DressUpModel:TryOn API — works
-    -- without any DLL hooks. Weapons last (their attach order matters). Non-weapon
-    -- slots are tried on additively; weapons route through a full Undress→TryOn cycle
-    -- so off-hand weapons land on the correct hand.
+    -- The faked preview only works when the DLL is loaded (it provides the SetCreature hook).
+    -- Without it we must NOT poke SetCreature with a sentinel (the real SetCreature would try
+    -- to load a bogus creature), so we simply don't preview.
+    function frame:CanFakePreview()
+        return self.liveUnitModel and ns.IsMorpherReady and ns.IsMorpherReady() and true or false
+    end
+
+    -- Faked, client-side ONLY: show the currently-selected slot items on the live model with
+    -- no server morph and no sync. Base = the real character (SetUnit player); the chosen
+    -- items are tried on top via the SetCreature-sentinel hook. Weapons last (their attach
+    -- order matters), mirroring ns.DressPreviewModel. The real morph only happens on Apply All.
     function frame:PreviewApplyItems()
+        if not self:CanFakePreview() then return end   -- DLL absent: no-op (model stays live)
         self.previewActive = true
         self.previewUndressed = false
         model:SetUnit("player")
-        model:Undress()
         local items = ns.BuildPreviewSlotItems and ns.BuildPreviewSlotItems() or {}
         local mainHand, offHand, ranged
         for _, slotName in ipairs(ns.slotOrder or {}) do
@@ -180,20 +201,22 @@ function ns.CreateDressingRoom(name, parent, opts)
                 if slotName == ns.mainHandSlot or slotName == "Main Hand" then mainHand = id
                 elseif slotName == ns.offHandSlot or slotName == "Off-hand" then offHand = id
                 elseif slotName == ns.rangedSlot or slotName == "Ranged" then ranged = id
-                else model:TryOn(id) end
+                else ns.TryOnPreviewItem(model, id, slotName) end
             end
         end
-        if offHand then model:TryOn(offHand) end
-        if mainHand then model:TryOn(mainHand) end
-        if ranged and not mainHand and not offHand then model:TryOn(ranged) end
+        if offHand then ns.TryOnPreviewItem(model, offHand, ns.offHandSlot or "Off-hand") end
+        if mainHand then ns.TryOnPreviewItem(model, mainHand, ns.mainHandSlot or "Main Hand") end
+        if ranged and not mainHand and not offHand then ns.TryOnPreviewItem(model, ranged, ns.rangedSlot or "Ranged") end
     end
 
-    -- Client-side undress: strip all previewed items from the model.
+    -- Faked undress of the live model (the real character keeps its gear).
     function frame:PreviewUndressFaked()
+        if not self.liveUnitModel then model:Undress(); return end
+        if not self:CanFakePreview() then self.previewActive = false; self:RefreshLiveUnit(); return end
         self.previewActive = true
         self.previewUndressed = true
         model:SetUnit("player")
-        model:Undress()
+        model:SetCreature(PV_UNDRESS)
     end
 
     if liveUnitModel then
@@ -397,6 +420,7 @@ function ns.CreateDressingRoom(name, parent, opts)
     local originSetBackdrop = frame.SetBackdrop
     function frame:SetBackdrop(backdrop)
         originSetBackdrop(frame, backdrop)
+        model:ClearAllPoints()
         model:SetPoint("TOPLEFT", backdrop.insets.left * 2, -backdrop.insets.top * 2)
         model:SetPoint("BOTTOMRIGHT", -backdrop.insets.right * 2, backdrop.insets.bottom * 2)
     end
@@ -422,6 +446,13 @@ local function IsPositiveItemId(itemId)
 end
 
 function ns.GetCurrentPreviewSlotItem(slotName)
+    local mainFrame = ns.mainFrame
+    local slot = mainFrame and mainFrame.slots and mainFrame.slots[slotName]
+    if slot then
+        if slot.isHiddenSlot then return nil, true end
+        if not slot.isMorphed and IsPositiveItemId(slot.itemId) then return slot.itemId, false end
+    end
+
     local equipSlotId = ns.slotToEquipSlotId and ns.slotToEquipSlotId[slotName]
     local state = TransmorpherCharacterState
     if equipSlotId and state then
@@ -435,10 +466,7 @@ function ns.GetCurrentPreviewSlotItem(slotName)
         end
     end
 
-    local mainFrame = ns.mainFrame
-    local slot = mainFrame and mainFrame.slots and mainFrame.slots[slotName]
     if slot then
-        if slot.isHiddenSlot then return nil, true end
         if IsPositiveItemId(slot.morphedItemId) then return slot.morphedItemId, false end
         if IsPositiveItemId(slot.itemId) then return slot.itemId, false end
     end
@@ -519,16 +547,16 @@ function ns.DressPreviewModel(model, overrides, opts)
             elseif slotName == ns.rangedSlot or slotName == "Ranged" then
                 ranged = itemId
             else
-                model:TryOn(itemId)
+                ns.TryOnPreviewItem(model, itemId, slotName)
                 renderIds[#renderIds + 1] = itemId
             end
         end
     end
 
-    if offHand then model:TryOn(offHand); renderIds[#renderIds + 1] = offHand end
-    if mainHand then model:TryOn(mainHand); renderIds[#renderIds + 1] = mainHand end
+    if offHand then ns.TryOnPreviewItem(model, offHand, ns.offHandSlot or "Off-hand"); renderIds[#renderIds + 1] = offHand end
+    if mainHand then ns.TryOnPreviewItem(model, mainHand, ns.mainHandSlot or "Main Hand"); renderIds[#renderIds + 1] = mainHand end
     if ranged and not mainHand and not offHand then
-        model:TryOn(ranged)
+        ns.TryOnPreviewItem(model, ranged, ns.rangedSlot or "Ranged")
         renderIds[#renderIds + 1] = ranged
     end
 

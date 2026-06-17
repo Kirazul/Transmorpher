@@ -1,6 +1,6 @@
 local addon, ns = ...
 
--- WoW 3.3.5a Mount Database (v1.1.5 Verified)
+-- WoW 3.3.5a Mount Database (v3.0.0)
 -- Format: { name, spellID, displayID, "model\\path.m2" }
 -- Sources: Spell.dbc, CreatureDisplayInfo.dbc, CreatureModelData.dbc
 -- displayID = CreatureDisplayInfo ID used by UNIT_FIELD_MOUNTDISPLAYID

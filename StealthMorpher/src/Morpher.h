@@ -18,17 +18,19 @@ void UpdateHasMorph();
 void ResetAllMorphs(bool forceClearOnly = false);
 void SoftResetState(WowObject* player);
 void PrimeOriginalState(WowObject* player);
-// Runs the deferred initial display refresh once the model system has had time
-// to warm up after world entry (prevents the cold-start model-reload crash on
-// the first login to a morphed character). Call once per timer tick in world.
+// Legacy deferred initial refresh hook. World entry now keeps this disabled to
+// avoid the visible 1-second login/reload/teleport blink.
 void ProcessDeferredInitialRefresh(WowObject* player);
-// Fire the coalesced skin/recolor model rebuild after a batch of recolor commands
-// has settled (one rebuild per batch -> flicker-free apply/remove, no relog). Call
-// once per timer tick in world. Runs independently of MorphGuard.
+// Fire the coalesced skin/recolor component re-attach after a batch of recolor
+// commands has settled. No local-player model teardown.
 void ProcessDeferredSkinRefresh(WowObject* player);
 // Cancel the deferred login "safety net" refresh once a command batch has already
 // rebuilt the model, so entering world never does a second full reload.
 void CancelDeferredInitialRefresh();
+// Lightweight component-only refresh — re-attaches all equipment items without
+// destroying/recreating the base model. Wraps CGUnit_C::RefreshAllComponentItems
+// @0x6E09E0. Safe to call at any time (engine no-ops if model isn't ready).
+void ForceRefreshComponents(WowObject* player);
 // Camera FOV control (client-side). degrees<=0 disables (leaves client default).
 void SetCameraFov(float degrees);
 void ApplyCameraFov();

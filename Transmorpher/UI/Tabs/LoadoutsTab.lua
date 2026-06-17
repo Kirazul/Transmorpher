@@ -534,6 +534,7 @@ local function UpdateLoadoutPreview(loadout)
     local pending = {}
     local pendingMainHand = nil
     local pendingOffHand = nil
+    local pendingRanged = nil
     for index, slotName in ipairs(slotOrder) do
         local rawItemId = loadout.items and loadout.items[index]
         local itemId = rawItemId
@@ -548,8 +549,10 @@ local function UpdateLoadoutPreview(loadout)
                     pendingMainHand = itemId
                 elseif slotName == "Off-hand" then
                     pendingOffHand = itemId
-                elseif slotName ~= "Ranged" then
-                    table.insert(pending, itemId)
+                elseif slotName == "Ranged" then
+                    pendingRanged = itemId
+                else
+                    table.insert(pending, { itemId = itemId, slotName = slotName })
                 end
                 local _,_,_,_,_,_,_,_,_,tex = GetItemInfo(itemId)
                 if tex then s.itemTex:SetTexture(tex); s.itemTex:Show()
@@ -566,17 +569,27 @@ local function UpdateLoadoutPreview(loadout)
     end
 
     local function DressModel()
-        for _, id in ipairs(pending) do previewModel:TryOn(id) end
-        if pendingOffHand then previewModel:TryOn(pendingOffHand) end
-        if pendingMainHand then previewModel:TryOn(pendingMainHand) end
+        for _, entry in ipairs(pending) do
+            if ns.TryOnPreviewItem then ns.TryOnPreviewItem(previewModel, entry.itemId, entry.slotName)
+            else previewModel:TryOn(entry.itemId) end
+        end
+        if pendingOffHand then
+            if ns.TryOnPreviewItem then ns.TryOnPreviewItem(previewModel, pendingOffHand, "Off-hand") else previewModel:TryOn(pendingOffHand) end
+        end
+        if pendingMainHand then
+            if ns.TryOnPreviewItem then ns.TryOnPreviewItem(previewModel, pendingMainHand, "Main Hand") else previewModel:TryOn(pendingMainHand) end
+        end
+        if pendingRanged and not pendingMainHand and not pendingOffHand then
+            if ns.TryOnPreviewItem then ns.TryOnPreviewItem(previewModel, pendingRanged, "Ranged") else previewModel:TryOn(pendingRanged) end
+        end
     end
     DressModel()
 
     -- Retry uncached items
     local uc = 0
-    for _, id in ipairs(pending) do
-        local _,l = GetItemInfo(id)
-        if not l then uc = uc + 1; ns.QueryItem(id, nil) end
+    for _, entry in ipairs(pending) do
+        local _,l = GetItemInfo(entry.itemId)
+        if not l then uc = uc + 1; ns.QueryItem(entry.itemId, nil) end
     end
     if pendingOffHand then
         local _,l = GetItemInfo(pendingOffHand)
@@ -586,13 +599,17 @@ local function UpdateLoadoutPreview(loadout)
         local _,l = GetItemInfo(pendingMainHand)
         if not l then uc = uc + 1; ns.QueryItem(pendingMainHand, nil) end
     end
+    if pendingRanged then
+        local _,l = GetItemInfo(pendingRanged)
+        if not l then uc = uc + 1; ns.QueryItem(pendingRanged, nil) end
+    end
     if uc > 0 then
         local rc = 0; lookTimer.elapsed = 0
         lookTimer:SetScript("OnUpdate", function(self, dt) self.elapsed = self.elapsed + dt
             if self.elapsed >= 0.1 then self.elapsed = 0; rc = rc + 1
                 local all = true
-                for _, id in ipairs(pending) do
-                    local _,l = GetItemInfo(id)
+                for _, entry in ipairs(pending) do
+                    local _,l = GetItemInfo(entry.itemId)
                     if not l then all = false; break end
                 end
                 if all and pendingOffHand then
@@ -601,6 +618,10 @@ local function UpdateLoadoutPreview(loadout)
                 end
                 if all and pendingMainHand then
                     local _,l = GetItemInfo(pendingMainHand)
+                    if not l then all = false end
+                end
+                if all and pendingRanged then
+                    local _,l = GetItemInfo(pendingRanged)
                     if not l then all = false end
                 end
                 if all or rc >= 15 then DressModel(); self:Hide(); self:SetScript("OnUpdate", nil) end

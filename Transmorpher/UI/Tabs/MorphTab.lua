@@ -16,16 +16,15 @@ do
         if self.timer > 0 then return end
         self:Hide()
         self.timer = 0
-        if mainFrame and mainFrame.dressingRoom and ns.SyncDressingRoom then
-            mainFrame.dressingRoom.forceLiveAfterSync = true
-            ns.SyncDressingRoom()
+        if mainFrame and mainFrame.dressingRoom and ns.ScheduleDressingRoomSync then
+            ns.ScheduleDressingRoomSync(0.01)
         elseif mainFrame and mainFrame.dressingRoom then
             mainFrame.dressingRoom:SetUnit("player")
             if mainFrame.dressingRoom.ShowLive then mainFrame.dressingRoom:ShowLive() end
         end
     end)
     ns.UpdatePreviewModel = function()
-        f.timer = 0.5
+        f.timer = 0.08
         f:Show()
     end
 end

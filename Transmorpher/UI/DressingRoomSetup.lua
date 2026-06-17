@@ -17,7 +17,7 @@ local dressingRoomBorderBackdrop = ns.Backdrops.dressingRoom
 -- All". A DressUpModel natively supports TryOn/Undress (a live PlayerModel does NOT — that
 -- was why clicking an item never previewed and Undress did nothing). SyncDressingRoom does
 -- the dressing; item clicks and Undress flow straight through to the model.
-mainFrame.dressingRoom = ns.CreateDressingRoom(nil, mainFrame, { liveUnitModel = false })
+mainFrame.dressingRoom = ns.CreateDressingRoom(nil, mainFrame)
 
 do
     local dr = mainFrame.dressingRoom

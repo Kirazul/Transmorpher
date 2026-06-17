@@ -126,14 +126,21 @@ local function OpenColorPicker(r, g, b, onChange)
     if OpacitySliderFrame then OpacitySliderFrame:SetFrameStrata("TOOLTIP"); OpacitySliderFrame:Raise() end
 end
 
+local previewRefresh = CreateFrame("Frame")
+previewRefresh:Hide()
+previewRefresh.t = 0
+previewRefresh:SetScript("OnUpdate", function(self, dt)
+    self.t = self.t - (dt or 0)
+    if self.t > 0 then return end
+    self:Hide()
+    if ns.UpdatePreviewModel then ns.UpdatePreviewModel() end
+    if ns.SyncDressingRoom then ns.SyncDressingRoom() end
+end)
+
 local function RefreshModel(delay)
-    if ns.QueueCharacterPreviewSync then
-        ns.QueueCharacterPreviewSync(delay or 0.18)
-    elseif ns.ScheduleDressingRoomSync then
-        ns.ScheduleDressingRoomSync(delay or 0.18)
-    elseif ns.SyncDressingRoom then
-        ns.SyncDressingRoom()
-    end
+    ns._skinChangeSeq = (ns._skinChangeSeq or 0) + 1
+    previewRefresh.t = delay or 0.18
+    previewRefresh:Show()
 end
 
 -- The item currently SHOWING in a slot: live UI morph first, saved morph state during

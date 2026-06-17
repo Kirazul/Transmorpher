@@ -5,12 +5,12 @@ local addon, ns = ...
 -- ============================================================
 
 local mainFrame = ns.mainFrame
-local ACTION_GAP = 5
+local ACTION_GAP = 6
 local ACTION_WIDTH = math.floor(((mainFrame.dressingRoom:GetWidth() or 400) - ACTION_GAP * 3) / 4)
-local ACTION_REST_BG = { 0.12, 0.085, 0.030, 0.98 }
-local ACTION_REST_BD = { 0.82, 0.64, 0.22, 0.98 }
-local ACTION_HOVER_BG = { 0.20, 0.145, 0.045, 0.99 }
-local ACTION_HOVER_BD = { 1.00, 0.82, 0.28, 1.00 }
+local ACTION_REST_BG = { 0.125, 0.085, 0.025, 0.99 }
+local ACTION_REST_BD = { 0.92, 0.70, 0.20, 0.98 }
+local ACTION_HOVER_BG = { 0.205, 0.145, 0.042, 1.00 }
+local ACTION_HOVER_BD = { 1.00, 0.86, 0.34, 1.00 }
 local ACTION_TEXT = "|cffF5C842%s|r"
 
 -- ============================================================
@@ -111,11 +111,44 @@ end
 
 local function ApplyGoldenActionButton(btn, text)
     btn:SetText(ACTION_TEXT:format(text))
+    local fontString = btn:GetFontString()
+    if fontString then
+        fontString:ClearAllPoints()
+        fontString:SetPoint("CENTER", btn, "CENTER", 0, 0)
+        fontString:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
+    end
     btn:SetBackdrop(actionButtonBackdrop)
     btn:SetBackdropColor(ACTION_REST_BG[1], ACTION_REST_BG[2], ACTION_REST_BG[3], ACTION_REST_BG[4])
     btn:SetBackdropBorderColor(ACTION_REST_BD[1], ACTION_REST_BD[2], ACTION_REST_BD[3], ACTION_REST_BD[4])
     ns.RegisterSmoothHover(btn, ACTION_REST_BG, ACTION_REST_BD)
     StyleActionButton(btn)
+end
+
+local function LayoutActionButtons()
+    local applyAll = mainFrame.buttons.applyAll
+    local resetMorph = mainFrame.buttons.resetMorph
+    local reset = mainFrame.buttons.reset
+    local undress = mainFrame.buttons.undress
+    if not (applyAll and resetMorph and reset and undress and mainFrame.dressingRoom) then return end
+
+    local rowWidth = mainFrame.dressingRoom:GetWidth() or 400
+    local buttonWidth = math.floor((rowWidth - ACTION_GAP * 3) / 4)
+    local buttons = { applyAll, resetMorph, reset, undress }
+
+    for i, button in ipairs(buttons) do
+        button:ClearAllPoints()
+        button:SetHeight(38)
+        if i == 1 then
+            button:SetPoint("TOPLEFT", mainFrame.dressingRoom, "BOTTOMLEFT", 0, -6)
+        else
+            button:SetPoint("TOPLEFT", buttons[i - 1], "TOPRIGHT", ACTION_GAP, 0)
+        end
+        if i < #buttons then
+            button:SetWidth(buttonWidth)
+        else
+            button:SetPoint("TOPRIGHT", mainFrame.dressingRoom, "BOTTOMRIGHT", 0, -6)
+        end
+    end
 end
 
 local function HoverGoldenActionButton(btn)
@@ -124,16 +157,6 @@ end
 
 local function LeaveGoldenActionButton(btn)
     ns.SmoothBackdropTo(btn, ACTION_REST_BG, ACTION_REST_BD)
-end
-
-local function ReturnPreviewToLive(delay)
-    if not mainFrame.dressingRoom or not mainFrame.dressingRoom.ShowLive then return end
-    local function showLive()
-        if mainFrame.dressingRoom and mainFrame.dressingRoom.ShowLive then
-            mainFrame.dressingRoom:ShowLive()
-        end
-    end
-    if ns.RunAfter then ns.RunAfter(delay or 0.12, showLive) else showLive() end
 end
 
 -- Apply All
@@ -225,21 +248,18 @@ do
                 end
             end
         end
-        -- Always end the batch with ONE REFRESH so the DLL commits the descriptors
-        -- and does exactly one model rebuild — guarantees the items actually show
-        -- even when every ITEM command was a no-op (dedup) or descriptors were
-        -- reverted. No per-item refresh burst.
-        if didChange then
-            table.insert(cmdQueue, "REFRESH")
+        -- Do not force a REFRESH here. The DLL applies descriptor changes during
+        -- the batch and component-refreshes only when something actually changed;
+        -- a no-op refresh was causing the visible delayed blink.
+        if didChange and #cmdQueue > 0 then
             ns.SendMorphCommand(table.concat(cmdQueue, "|"))
-            if mainFrame.dressingRoom then mainFrame.dressingRoom.forceLiveAfterSync = true end
-            if ns.ScheduleDressingRoomSync then ns.ScheduleDressingRoomSync(0.05) end
             SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: All slots morphed!")
         else
-            -- Nothing changed in the queue, but still force one clean refresh so a
-            -- re-click reliably re-commits the current preview to the character.
-            ns.SendMorphCommand("REFRESH")
-            SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: Refreshed.")
+            SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: No changes to apply.")
+        end
+        if mainFrame.dressingRoom then
+            mainFrame.dressingRoom:SetModelAlpha(1)
+            mainFrame.dressingRoom.suppressSyncUntil = nil
         end
         PlaySound("gsTitleOptionOK")
     end)
@@ -320,13 +340,11 @@ do
                 end
             end
             if mainFrame.dressingRoom then mainFrame.dressingRoom.forceLiveAfterSync = true end
+            if mainFrame.dressingRoom then mainFrame.dressingRoom.suppressSyncUntil = nil end
             ns.SyncDressingRoom()
             if ns.BroadcastMorphState then
                 ns.BroadcastMorphState(true)
             end
-            ReturnPreviewToLive(0.18)
-            ReturnPreviewToLive(0.75)
-            ReturnPreviewToLive(1.40)
             SELECTED_CHAT_FRAME:AddMessage("|cffF5C842<Transmorpher>|r: All morphs reset!")
         end
         PlaySound("gsTitleOptionOK")
@@ -353,13 +371,12 @@ do
         -- to a bare real-race player. frame:Reset() only re-points the camera/unit, so
         -- follow it with a full SyncDressingRoom rebuild from the live slot state.
         if mainFrame.dressingRoom and mainFrame.dressingRoom.Reset then
+            mainFrame.dressingRoom.suppressSyncUntil = nil
             mainFrame.dressingRoom:Reset()
         end
         if mainFrame.dressingRoom and mainFrame.dressingRoom.ShowLive then
             mainFrame.dressingRoom:ShowLive()
         end
-        ReturnPreviewToLive(0.06)
-        ReturnPreviewToLive(0.72)
         PlaySound("gsTitleOptionOK")
     end)
     btn:HookScript("OnEnter", HoverGoldenActionButton)
@@ -380,3 +397,6 @@ do
     btn:HookScript("OnEnter", HoverGoldenActionButton)
     btn:HookScript("OnLeave", LeaveGoldenActionButton)
 end
+
+LayoutActionButtons()
+mainFrame:HookScript("OnSizeChanged", LayoutActionButtons)

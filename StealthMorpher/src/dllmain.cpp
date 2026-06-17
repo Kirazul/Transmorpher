@@ -373,8 +373,8 @@ static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWOR
         // Run MorphGuard handles local player, RemoteMorphGuard handles others
         if (player) {
             MorphGuard(player);
-            // Fire the deferred initial model refresh once the model system has
-            // warmed up after login (prevents the first-login cold-start crash).
+            // Legacy deferred initial refresh is disabled in Morpher.cpp; keep
+            // this call as a safety drain so no path can re-arm the 1s blink.
             ProcessDeferredInitialRefresh(player);
             // Fire the coalesced skin/recolor rebuild after a batch of recolor
             // commands settles (one re-bake per batch: flicker-free, no relog).
@@ -430,7 +430,7 @@ static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWOR
                         g_hookSuccess ? "true" : "false", g_initStatus);
                     FrameScript_Execute(statusCmd, "Transmorpher", 0);
 
-                    FrameScript_Execute("if DEFAULT_CHAT_FRAME then DEFAULT_CHAT_FRAME:AddMessage('|cffffff00StealthMorpher v1.2.0|r initialized. Features: |cff00ff00ACTIVE|r') end", "Transmorpher", 0);
+                    FrameScript_Execute("if DEFAULT_CHAT_FRAME then DEFAULT_CHAT_FRAME:AddMessage('|cffffff00StealthMorpher v3.0.0|r initialized. Features: |cff00ff00ACTIVE|r') end", "Transmorpher", 0);
                     g_luaLoadedSent = true;
                     Log("Sent DLL_LOADED flag and welcome message to Lua");
 
@@ -461,11 +461,11 @@ static VOID CALLBACK MorphTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWOR
                         }
 
                         if (needsVisualUpdate && player) {
-                            if (CGUnit_UpdateDisplayInfo) {
-                                __try { CGUnit_UpdateDisplayInfo(player, 1); } __except(1) {}
-                            }
-                            // This batch already rebuilt the model — cancel the deferred
-                            // login forced refresh so entering world doesn't reload twice.
+                            // Component-only refresh: re-attaches all equipment without
+                            // destroying the base model — no character flicker.
+                            ForceRefreshComponents(player);
+                            // Cancel any legacy deferred refresh so entering world
+                            // cannot do a second delayed visual pass.
                             CancelDeferredInitialRefresh();
                             ReStampWeapons(player);
                             // When MOUNTED, the rider model caches its equipment, so a
