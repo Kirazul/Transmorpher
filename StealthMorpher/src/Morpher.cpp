@@ -245,14 +245,10 @@ static char g_dllDir[MAX_PATH] = {0};
 static bool g_initialRefreshDone = false;
 static uint64_t g_lastLoadedGuid = 0;
 
-// Deferred initial display refresh. On a fresh client session the model system
-// is still "cold" right after the player object first appears; forcing a model
-// reload (CGUnit_UpdateDisplayInfo) that early can silently crash the client on
-// the first login to a morphed character. We therefore write the morph
-// descriptors immediately but defer the forced model reload by this many timer
-// ticks (50ms each) so the world/model system has settled. A relog already warms
-// the system, which is exactly why the old code only crashed on the first login.
-static const int INITIAL_REFRESH_DELAY_TICKS = 20; // ~1.0s
+// Deferred initial refresh is intentionally disabled. The descriptor state is
+// already enforced immediately on world entry; firing a second component/model
+// refresh about 1s later was the visible login/reload/teleport blink.
+static const int INITIAL_REFRESH_DELAY_TICKS = 0;
 static int g_pendingInitialRefreshTicks = 0;
 
 // Coalesced skin/recolor rebuild. The Skin tab fans out one descriptor command per
@@ -260,9 +256,10 @@ static int g_pendingInitialRefreshTicks = 0;
 // in a single frame). Doing a full body re-bake inside EACH command both flickers
 // and races the compositor's async texture release — which is exactly why a removal
 // "sometimes" needed a relog. Instead every recolor command just arms this counter;
-// the tick loop fires ONE RefreshPlayerModelFull after the batch settles. Result:
-// apply AND remove take in one shot, flicker-free, no relog. ~2 ticks (~100ms).
-static const int SKIN_REFRESH_DELAY_TICKS = 2;
+// the tick loop fires one component re-attach after the batch settles. Next tick keeps
+// same-frame texture work out of the engine's active decode path without a
+// noticeable delayed rebuild.
+static const int SKIN_REFRESH_DELAY_TICKS = 1;
 int g_pendingSkinRefreshTicks = 0;
 // Set when the pending refresh must force object-component attachments (helmet/
 // shoulder/cape/weapon) to re-resolve their CTexture instead of keeping an old one.
@@ -281,22 +278,44 @@ static uint32_t g_pendingModelTintReload[20] = {0};
 // set it live each tick instead of hooking the constructor — no Detour, no CVar.
 // g_cameraFovDeg == 0 means "leave the client default untouched".
 // ---------------------------------------------------------------------------
-static float g_cameraFovDeg = 0.0f; // 0 = off; otherwise 20..150 degrees
+static float g_cameraFovDeg = 0.0f; // 0 = off; otherwise 20..350 degrees
+static float g_originalCameraFovRad = 0.0f; // captured from client before first override
+static bool g_originalCameraFovCaptured = false;
 typedef void* (__cdecl* GetActiveCamera_fn)();
 
 void ApplyCameraFov() {
-    if (g_cameraFovDeg <= 0.0f) return;
     GetActiveCamera_fn getCam = reinterpret_cast<GetActiveCamera_fn>(0x004F5960);
     void* cam = nullptr;
     __try { cam = getCam(); } __except (EXCEPTION_EXECUTE_HANDLER) { return; }
     if (!cam || reinterpret_cast<uintptr_t>(cam) < 0x10000) return;
+
+    if (g_cameraFovDeg <= 0.0f) {
+        // Restore the original client FOV that was captured before the first override.
+        if (g_originalCameraFovCaptured) {
+            __try { *reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(cam) + 0x40) = g_originalCameraFovRad; }
+            __except (EXCEPTION_EXECUTE_HANDLER) {}
+        }
+        return;
+    }
+
+    // Capture the original FOV once before applying the first override.
+    if (!g_originalCameraFovCaptured) {
+        __try { g_originalCameraFovRad = *reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(cam) + 0x40); }
+        __except (EXCEPTION_EXECUTE_HANDLER) { g_originalCameraFovRad = 1.3962634f; } // ~80 degrees fallback
+        g_originalCameraFovCaptured = true;
+    }
+
     const float fovRad = g_cameraFovDeg * (3.14159265f / 180.0f);
     __try { *reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(cam) + 0x40) = fovRad; }
     __except (EXCEPTION_EXECUTE_HANDLER) {}
 }
 
 void SetCameraFov(float degrees) {
-    if (degrees <= 0.0f) { g_cameraFovDeg = 0.0f; return; } // disable / leave default
+    if (degrees <= 0.0f) {
+        g_cameraFovDeg = 0.0f;
+        ApplyCameraFov();  // restore original FOV
+        return;
+    }
     if (degrees < 20.0f) degrees = 20.0f;
     if (degrees > 350.0f) degrees = 350.0f;  // allow very wide (fish-eye) FOV
     g_cameraFovDeg = degrees;
@@ -1870,26 +1889,16 @@ void SoftResetState(WowObject* player) {
 
     UpdateHasMorph(); // Recalculate from current morph targets
 
-    // ROBUST LOGIN: Ensure all morph targets are written to descriptors NOW, but
-    // DEFER the forced model reload. Writing the descriptors is safe even on a
-    // cold model system; only the forced CGUnit_UpdateDisplayInfo reload can crash
-    // if it runs before the model system has warmed up (see ProcessDeferredInitialRefresh).
+    // ROBUST LOGIN: Ensure all morph targets are written to descriptors NOW.
+    // Do not schedule a delayed refresh here; the state is already visible before
+    // it fires, and the late refresh was the 1-second login/reload/teleport blink.
     if ((g_hasMorph || g_hasSkin || g_barberActive) && player && !g_initialRefreshDone) {
         // Enforce character/item/scale state immediately (descriptor writes only).
-        // Only arm the deferred forced refresh if we ACTUALLY changed something.
-        // If the morph was already applied (e.g. the addon's SendFullMorphState
-        // raced ahead and rebuilt the model), the descriptors already match and
-        // a second forced reload would be the visible "double reload on login".
         bool changed = ApplyMorphState(player);
-        // Stamp the saved barber look (skin/face/hair) into PLAYER_BYTES now; the
-        // deferred forced refresh below rebuilds the model so it shows on the first
-        // frame, exactly like a persisted skin.
+        // Stamp the saved barber look (skin/face/hair) into PLAYER_BYTES now.
         if (g_barberActive) changed = ApplyBarberToPlayer(player, false) || changed;
         g_initialRefreshDone = true;
-        // A persisted skin always needs the deferred refresh: the retex/tint must be
-        // bound (in ProcessDeferredInitialRefresh) and composited once, so the look is
-        // on the very first rendered frame (no flicker) even with no morph.
-        g_pendingInitialRefreshTicks = (changed || g_hasSkin || g_barberActive) ? INITIAL_REFRESH_DELAY_TICKS : 0;
+        g_pendingInitialRefreshTicks = INITIAL_REFRESH_DELAY_TICKS;
         Log("Login morph descriptors applied; changed=%d skin=%d deferredTicks=%d (MorphId=%u)",
             changed ? 1 : 0, g_hasSkin ? 1 : 0, g_pendingInitialRefreshTicks, g_morphDisplay);
     }
@@ -1897,76 +1906,25 @@ void SoftResetState(WowObject* player) {
     Log("Soft reset complete");
 }
 
-// Called whenever a command batch already rebuilt the model (dllmain post-batch
-// UpdateDisplayInfo). The morph is now visually applied, so the deferred login
-// "safety net" forced refresh is redundant — firing it ~1s later causes a SECOND
-// full model re-bake that reads as the world reloading on entering world ("double
-// reload"). Cancel it and mark the initial refresh handled.
+// Kept as a cancellation point for any older path that might arm the deferred
+// refresh. New world-entry code keeps it disabled.
 void CancelDeferredInitialRefresh() {
     g_pendingInitialRefreshTicks = 0;
     g_initialRefreshDone = true;
 }
 
 void ProcessDeferredInitialRefresh(WowObject* player) {
-    if (g_pendingInitialRefreshTicks <= 0) return;
-
-    // Count down each tick; only fire once the grace window has fully elapsed.
-    if (--g_pendingInitialRefreshTicks > 0) return;
-
-    if (!player || !player->descriptors || (!g_hasMorph && !g_hasSkin && !g_barberActive)) return;
-
-    // Re-stamp the barber bytes right before the rebuild so the model composites the
-    // saved skin/face/hair on its very first frame (no un-styled flash on login).
-    if (g_barberActive) ApplyBarberToPlayer(player, false);
-
-    // 0. Bind any persisted skins to the items now stamped in the descriptor, BEFORE
-    //    the composite below — so the first rebuilt frame already shows the skin and
-    //    there is no un-skinned flash on login. (ApplyPersistedSkins only edits the
-    //    shared ItemDisplayInfo here; the rebuild that follows composites it.)
-    bool hadSkin = g_hasSkin;
-    if (hadSkin) ApplyPersistedSkins(player);
-
-    // 1. Base character model refresh (now that the model system is warm). When a
-    //    skin is present we use the body-armor-safe full rebuild so helmet/shoulder/
-    //    chest skins composite correctly on the very first frame.
-    if (hadSkin) {
-        RefreshPlayerModelFull(player);
-        Log("Deferred refresh w/ skins applied. MorphId=%u", g_morphDisplay);
-    } else if (CGUnit_UpdateDisplayInfo) {
-        ScopedUpdateDisplayInfo(player, 1);
-        Log("Deferred base character refresh applied. MorphId=%u", g_morphDisplay);
-    }
-
-    // 2. Enforce mount state manually AFTER the character refresh (isolated).
-    if (g_morphMount > 0 && player->descriptors) {
-        uint8_t* desc = (uint8_t*)player->descriptors;
-        uint32_t currentMount = *(uint32_t*)(desc + UNIT_FIELD_MOUNTDISPLAYID);
-
-        // Only trigger if actually mounted on the server
-        if (currentMount > 0) {
-            uint32_t targetMount = (g_morphMount == HIDDEN_SENTINEL) ? 0 : g_morphMount;
-            *(uint32_t*)(desc + UNIT_FIELD_MOUNTDISPLAYID) = targetMount;
-            *(uint32_t*)((uint8_t*)player + 0x9C0) = targetMount;
-            g_lastAppliedMount = targetMount;
-
-            if (CGUnit_C_DismountModel) {
-                __try { CGUnit_C_DismountModel(player, 0); } __except(1) {}
-            }
-            if (CGUnit_C_MountModel) {
-                __try { CGUnit_C_MountModel(player, 0, 0); } __except(1) {}
-            }
-            Log("Deferred isolated mount refresh applied. MountId=%u", targetMount);
-        } else {
-            g_lastAppliedMount = 0;
-        }
+    (void)player;
+    if (g_pendingInitialRefreshTicks > 0) {
+        g_pendingInitialRefreshTicks = 0;
+        Log("Deferred initial refresh suppressed to prevent login/reload blink.");
     }
 }
 
-// Fire the coalesced skin/recolor rebuild once a batch of recolor commands has
+// Fire the coalesced skin/recolor component re-attach once a batch of recolor commands has
 // settled (see g_pendingSkinRefreshTicks). Runs every tick from the main loop,
 // independently of MorphGuard — so it still fires after a full "Reset All" leaves
-// no morph and no skin (g_hasMorph == g_hasSkin == false). Exactly one rebuild per
-// batch: flicker-free apply AND removal, no relog.
+// no morph and no skin (g_hasMorph == g_hasSkin == false). No model teardown.
 void ProcessDeferredSkinRefresh(WowObject* player) {
     if (g_pendingSkinRefreshTicks <= 0) return;
     if (--g_pendingSkinRefreshTicks > 0) return;
@@ -1992,24 +1950,19 @@ void ProcessDeferredSkinRefresh(WowObject* player) {
             }
         }
 
-        RefreshPlayerModelFull(player);
-        // Object-component paths need a full re-resolve whenever the attachment might
-        // keep an old CTexture: removals clear stale color, applies pick up the new
-        // virtual tint key without waiting for a client restart.
-        if (hard && CGUnit_UpdateDisplayInfo) {
-            ScopedUpdateDisplayInfo(player, 1);
-            // Engine-level per-component re-equip: the only thing that reliably drops the
-            // cached tinted texture on helmet/shoulder/chest/cape without a relog.
-            ForceRefreshComponents(player);
-        }
+        // Pure item color/retex edits keep the same visible item IDs, so a component
+        // re-attach alone can leave the in-world character holding the old baked
+        // armor composite until another morph/apply happens. Hard refreshes use the
+        // full visible-item bounce to force the live player model to re-compose now.
+        if (hard) RefreshPlayerModelFull(player);
+        else ForceRefreshComponents(player);
         // Weapons cache their texture/glow independently of the body composite and
         // MorphGuard's own weapon-refresh path is skipped once nothing is morphed
         // (e.g. right after a reset). Re-stamp here so a reskinned/tinted weapon
         // always clears/updates with the batch — no relog.
         ReStampWeapons(player);
 
-        // The rebuild above dropped any attached character visuals — re-attach the active
-        // ones so they "run forever" across morphs / reskins / zone changes.
+        // Keep active character visuals attached across reskins / zone changes.
         if (Visuals_HasActive()) Visuals_Reapply();
     }
 }
@@ -2042,7 +1995,7 @@ void ResetAllMorphs(bool forceClearOnly) {
         g_hasMorph = false;
         g_suspended = false;
         g_saved = false;
-        g_initialRefreshDone = false; // PER-CHARACTER REFRESH: Allow new character to trigger a visual refresh
+        g_initialRefreshDone = false; // allow next character to stamp descriptors once
         g_pendingInitialRefreshTicks = 0; // Cancel any pending deferred refresh from the previous character
         g_pendingSkinRefreshTicks = 0;    // Drop any pending recolor re-bake from the previous character
         g_lastLoadedGuid = 0;        // Reset tracking so we can reload the same character if needed
@@ -2555,11 +2508,12 @@ bool DoMorph(const char* cmd, WowObject* player) {
         Log("[RESET] ITEM_SKIN_RESET:%d done", slot);
         return false;
     }
-    if (strncmp(cmd, "ITEM_RETEX_DEL:", 15) == 0) { ColorEngine::ItemRetexRemove((uint32_t)atoi(cmd + 15)); RefreshPlayerAppearance(); return false; }
+    if (strncmp(cmd, "ITEM_RETEX_DEL:", 15) == 0) { ColorEngine::ItemRetexRemove((uint32_t)atoi(cmd + 15)); g_pendingSkinHardReload = true; RefreshPlayerAppearance(); return false; }
     if (strncmp(cmd, "ITEM_RETEX:", 11) == 0) {
         int fromId = 0, toId = 0;
         if (sscanf_s(cmd + 11, "%d:%d", &fromId, &toId) == 2 && fromId > 0 && toId > 0) {
             if (ColorEngine::ItemRetexAdd((uint32_t)fromId, (uint32_t)toId)) {
+                g_pendingSkinHardReload = true;
                 RefreshPlayerAppearance();
             }
         }
@@ -2620,6 +2574,7 @@ bool DoMorph(const char* cmd, WowObject* player) {
                         g_slotRetexFrom[slot] = visId;
                         g_slotRetexTo[slot] = (uint32_t)toId;
                         g_skinAppliedTo[slot] = visId;
+                        g_pendingSkinHardReload = true;
                         RefreshPlayerAppearance();
                     }
                 }
@@ -2713,6 +2668,7 @@ bool DoMorph(const char* cmd, WowObject* player) {
                     g_skinTint[slot].saturation = (int32_t)saturation;
                     g_skinTint[slot].hueShift   = (uint32_t)hueShift;
                     if (slot >= 16 && slot <= 18) g_weaponRefreshTicks = 2;
+                    g_pendingSkinHardReload = true;
                     RefreshPlayerAppearance();
                 }
             }
@@ -2763,6 +2719,7 @@ bool DoMorph(const char* cmd, WowObject* player) {
                     g_skinTint[slot].saturation = 0;
                     g_skinTint[slot].hueShift   = 0;
                     if (slot >= 16 && slot <= 18) g_weaponRefreshTicks = 2;
+                    g_pendingSkinHardReload = true;
                     RefreshPlayerAppearance();
                 }
             }
@@ -3742,7 +3699,6 @@ bool DoMorph(const char* cmd, WowObject* player) {
         }
     }
     else if (strncmp(cmd, "RESUME", 6) == 0) {
-        bool wasSuspended = g_suspended;
         if (g_suspended) {
             g_suspended = false;
             update = true; // Only refresh when actually resuming from suspended
@@ -3755,9 +3711,9 @@ bool DoMorph(const char* cmd, WowObject* player) {
             }
         }
 
-        if (!wasSuspended && g_hasMorph) {
-            update = true;
-        }
+        // If RESUME was a no-op, do not force a visual refresh. Login/teleport paths
+        // can send RESUME repeatedly after descriptors are already correct; forcing
+        // a refresh there creates the delayed blink without changing anything.
     }
     // New Settings Commands
     else if (strncmp(cmd, "SET:DBW:", 8) == 0) {
@@ -4055,7 +4011,7 @@ void MorphGuard(WowObject* player) {
                 if (s_skinPassWasGearSwap) {
                     ForceRefreshComponents(player);
                 } else {
-                    RefreshPlayerModelFull(player);
+                    ForceRefreshComponents(player);
                 }
             } else if (CGUnit_UpdateDisplayInfo) {
                 ScopedUpdateDisplayInfo(player, 1);

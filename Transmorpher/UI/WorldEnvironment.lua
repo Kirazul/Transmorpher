@@ -119,13 +119,6 @@ function ns.QueueWorldEnvironmentSync()
     if not ns.IsMorpherReady or not ns.IsMorpherReady() then return end
 
     local settings = ns.GetWorldEnvironmentSettings()
-    if not settings.worldFogEnabled and not settings.worldFarClipEnabled then
-        if lastEnvironmentPayload ~= "" then
-            TRANSMORPHER_ENV_CFG = ""
-            lastEnvironmentPayload = ""
-        end
-        return
-    end
 
     local payload = {
         "worldfog=" .. (settings.worldFogEnabled and "1" or "0"),
