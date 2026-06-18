@@ -43,6 +43,44 @@ ns.Colors = {
     -- Status
     statusGreen = { 0.29, 0.80, 0.29 },
     statusRed   = { 0.80, 0.29, 0.29 },
+
+    -- ============================================================
+    -- DESIGN-SYSTEM PALETTE EXTENSIONS (Phase 1 UI overhaul)
+    -- Single source of truth for the refined dark-premium-gold theme.
+    -- All values are RGB(A) 0..1 tuples consumed by the Theme factories.
+    -- ============================================================
+    -- Surface tiers (darkest -> lightest). Window > card > well.
+    surfaceShell   = { 0.030, 0.025, 0.020, 0.985 },
+    surfaceCard    = { 0.055, 0.045, 0.032, 0.96  },
+    surfaceWell    = { 0.022, 0.018, 0.014, 0.98  },
+    surfaceInset   = { 0.045, 0.038, 0.028, 0.95  },
+
+    -- Hairlines & borders. "Hair" = default 1px; "Line" = structural; "Glow" = accent.
+    borderHair     = { 0.62, 0.49, 0.16, 0.85 },
+    borderHairDim  = { 0.40, 0.34, 0.16, 0.55 },
+    borderLine     = { 0.52, 0.39, 0.12, 0.75 },
+    borderAccent   = { 0.96, 0.78, 0.26, 1.00 },
+    borderGlow     = { 1.00, 0.82, 0.20, 1.00 },
+    borderHover    = { 0.80, 0.65, 0.22, 1.00 },
+
+    -- Row states for list rows (rgba, applied as SetTexture vertex color).
+    rowRest        = { 0.04, 0.035, 0.025, 0.0   },
+    rowStripe      = { 1.00, 1.00,  1.00,  0.018 },
+    rowHover       = { 0.30, 0.25,  0.10,  0.22  },
+    rowSelected    = { 0.60, 0.48,  0.15,  0.30  },
+
+    -- Text states (consumed directly via SetTextColor).
+    textPrimary    = { 0.96, 0.90, 0.72 },
+    textSecondary  = { 0.85, 0.78, 0.55 },
+    textMutedGold  = { 0.58, 0.52, 0.40 },
+    textAccent     = { 1.00, 0.84, 0.40 },
+    textHighlight  = { 1.00, 0.92, 0.64 },
+
+    -- Control backgrounds.
+    inputRest      = { 0.045, 0.040, 0.030, 0.96 },
+    inputFocus     = { 0.07,  0.06,  0.035, 0.98 },
+    buttonRest     = { 0.125, 0.085, 0.025, 0.99 },
+    buttonHover    = { 0.205, 0.145, 0.042, 1.00 },
 }
 
 -- ============================================================
@@ -413,4 +451,122 @@ ns.vehicleKeywords = {
     "Stabled Thunder Bluff Kodo", "Stabled Darkspear Raptor", "Stabled Forsaken Warhorse",
     "Stabled Orgrimmar Wolf", "Stabled Silvermoon Hawkstrider", "Stabled Sunreaver Hawkstrider",
     "Stabled Argent Warhorse",
+}
+
+-- ============================================================
+-- DESIGN SYSTEM — SPACING, THEME, ASSETS  (Phase 1 UI overhaul)
+-- Centralized spacing scale, named backdrop templates, and a single
+-- registry of every addon texture path. These are ADDITIVE: existing
+-- ns.Backdrops / ns.Dimensions / hard-coded textures are untouched.
+-- All factories in UI\Theme.lua read from here.
+-- ============================================================
+
+-- 4px base spacing scale. Use these instead of magic offsets so padding
+-- is consistent across panels.
+ns.Spacing = {
+    none  = 0,
+    xs    = 2,
+    sm    = 4,
+    md    = 6,
+    lg    = 8,
+    xl    = 12,
+    xxl   = 16,
+    panel = 10,   -- standard inner padding for scrollform panels
+    list  = 6,    -- standard gap around list wells
+}
+
+-- Standard control heights. Tab heights etc. live in ns.Dimensions.
+ns.Heights = {
+    row        = 28,   -- standard list row (Mounts/Pets/CPets)
+    rowCompact = 20,   -- dropdown / search-result rows
+    search     = 26,   -- search field
+    chip       = 18,   -- filter chip
+    button     = 26,   -- standard golden button
+    sectionGap = 14,   -- vertical gap between sections
+}
+
+-- Single registry of addon texture paths. NEVER inline these strings in
+-- factory code — reference ns.Assets.* so a path only ever lives in one place.
+ns.Assets = {
+    -- Procedural fill / 1px line textures shipped with the WoW client.
+    bgSolid      = "Interface\\ChatFrame\\ChatFrameBackground",
+    white        = "Interface\\Buttons\\WHITE8X8",
+    whiteLo      = "Interface\\Buttons\\WHITE8x8", -- casing used elsewhere in the codebase
+
+    -- Addon-provided item tiles (retail wardrobe feel). Three states.
+    tileNormal   = "Interface\\AddOns\\Transmorpher\\Textures\\item_bg_normal",
+    tileHover    = "Interface\\AddOns\\Transmorpher\\Textures\\item_bg_highlight",
+    tileSelected = "Interface\\AddOns\\Transmorpher\\Textures\\item_bg_selected",
+
+    -- Tab chrome.
+    tabActive    = "Interface\\AddOns\\Transmorpher\\Textures\\tab_active",
+    tabInactive  = "Interface\\AddOns\\Transmorpher\\Textures\\tab_inactive",
+
+    -- Decorative borders.
+    borderFull   = "Interface\\AddOns\\Transmorpher\\Textures\\border_full",
+    borderHi     = "Interface\\AddOns\\Transmorpher\\Textures\\border_highlight",
+    border2      = "Interface\\AddOns\\Transmorpher\\Textures\\border_2",
+    mirrorBorder = "Interface\\AddOns\\Transmorpher\\images\\mirror-border",
+    transmogBorder = "Interface\\AddOns\\Transmorpher\\Textures\\transmog_border",
+
+    -- Search / clear icons (addon-provided, sharper than the client ones).
+    searchIcon   = "Interface\\AddOns\\Transmorpher\\Textures\\ui-searchbox-icon",
+    searchClear  = "Interface\\AddOns\\Transmorpher\\Textures\\UI-SearchBox-Clear",
+
+    -- Client-side helpers reused by the theme.
+    highlightBand = "Interface\\QuestFrame\\UI-QuestTitleHighlight",
+    buttonHilight = "Interface\\Buttons\\ButtonHilight-Square",
+    checkBoxCheck = "Interface\\Buttons\\UI-CheckBox-Check",
+}
+
+-- Named backdrop templates. ns.Backdrops above stays as-is for back-compat;
+-- ns.Theme is the new canonical set consumed by the Theme factories.
+ns.Theme = {
+    -- Solid dark fill with a 1px gold hairline border. The default for cards,
+    -- wells, headers, search fields. edgeSize=1 keeps it crisp at any DPI.
+    panel = {
+        bgFile = ns.Assets.bgSolid,
+        edgeFile = ns.Assets.white,
+        tile = false, tileSize = 0, edgeSize = 1,
+        insets = { left = 1, right = 1, top = 1, bottom = 1 },
+    },
+    -- Inset well — darker fill, same hairline. Used behind list contents.
+    well = {
+        bgFile = ns.Assets.bgSolid,
+        edgeFile = ns.Assets.white,
+        tile = false, tileSize = 0, edgeSize = 1,
+        insets = { left = 1, right = 1, top = 1, bottom = 1 },
+    },
+    -- Tooltip-style golden border for prominent frames (selector dialogs etc.).
+    gilded = {
+        bgFile = ns.Assets.bgSolid,
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 12,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    },
+    -- Flat solid button: 1px gold border, fill supplied by the caller.
+    buttonFlat = {
+        bgFile = ns.Assets.white,
+        edgeFile = ns.Assets.white,
+        tile = false, tileSize = 0, edgeSize = 1,
+        insets = { left = 1, right = 1, top = 1, bottom = 1 },
+    },
+    -- Borderless inset for search/edit fields (border drawn as a texture so we
+    -- can animate its color via the smooth-hover system without SetBackdrop).
+    input = {
+        bgFile = ns.Assets.bgSolid,
+        tile = false, tileSize = 0, edgeSize = 0,
+        insets = { left = 0, right = 0, top = 0, bottom = 0 },
+    },
+}
+
+-- Named font styles. Returns nothing at load time; callers pass these strings
+-- to SetFont(). Centralized so font tuning lives in one place.
+ns.Fonts = {
+    title       = { "Fonts\\FRIZQT__.TTF", 16, "OUTLINE" },
+    sectionHead = { "Fonts\\FRIZQT__.TTF", 13, "OUTLINE" },
+    body        = { "Fonts\\FRIZQT__.TTF", 12 },
+    bodySmall   = { "Fonts\\FRIZQT__.TTF", 11 },
+    bodyTiny    = { "Fonts\\FRIZQT__.TTF", 10 },
+    input       = { "Fonts\\FRIZQT__.TTF", 11 },
 }
