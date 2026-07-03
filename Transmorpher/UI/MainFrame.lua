@@ -104,7 +104,7 @@ mainFrame:SetBackdrop({
     tile = false, tileSize = 0, edgeSize = 2,
     insets = { left = 2, right = 2, top = 2, bottom = 2 }
 })
-mainFrame:SetBackdropColor(0.035, 0.030, 0.024, 0.985)
+mainFrame:SetBackdropColor(0.030, 0.025, 0.020, 0.985)
 mainFrame:SetBackdropBorderColor(0.82, 0.62, 0.16, 0.95)
 
 -- Optional drop shadow (fake)
@@ -142,8 +142,15 @@ topSheen:SetVertexColor(1.0, 0.86, 0.36, 0.38)
 -- ============================================================
 local mainFrameTitle = "|cffF5C842Transmorpher|r  |cff6a6050v" .. ns.VERSION .. "|r"
 
+-- Brand icon to the left of the title (matches the .toc title glyph)
+local titleIcon = mainFrame:CreateTexture(nil, "OVERLAY")
+titleIcon:SetSize(20, 20)
+titleIcon:SetPoint("RIGHT", title, "LEFT", -8, 0)
+titleIcon:SetTexture("Interface\\Icons\\INV_Chest_Cloth_17")
+titleIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
 local title = mainFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-title:SetPoint("TOP", 0, -8)
+title:SetPoint("TOP", 14, -8)
 title:SetText(mainFrameTitle)
 title:SetFont("Fonts\\FRIZQT__.TTF", 16, "OUTLINE")
 title:SetShadowColor(0, 0, 0, 0.9)
@@ -161,7 +168,7 @@ stats:SetBackdrop({
     insets = { left = 0, right = 0, top = 0, bottom = 0 }
 })
 stats:SetBackdropColor(0.045, 0.038, 0.028, 0.95)
-stats:SetBackdropBorderColor(0.48, 0.36, 0.12, 0.85)
+stats:SetBackdropBorderColor(0.62, 0.49, 0.16, 0.85)
 stats:SetPoint("BOTTOMLEFT", 415, 8)
 stats:SetPoint("BOTTOMRIGHT", -24, 8)
 stats:SetHeight(24)
@@ -315,11 +322,16 @@ do
                 tabBtn.topLine:Show()
                 tabBtn.botLine:Hide()
                 tabBtn:GetFontString():SetTextColor(0.96, 0.78, 0.26, 1)
+                if tabBtn.activeGlow then tabBtn.activeGlow:Show() end
+                -- Lift the active label slightly so the tab reads as "raised"
+                tabBtn:GetFontString():SetPoint("CENTER", 0, 1)
             else
                 tabBtn.bg:SetTexture(0.055, 0.045, 0.032, 0.95)
                 tabBtn.topLine:Hide()
                 tabBtn.botLine:Show()
                 tabBtn:GetFontString():SetTextColor(0.62, 0.55, 0.40, 1)
+                if tabBtn.activeGlow then tabBtn.activeGlow:Hide() end
+                tabBtn:GetFontString():SetPoint("CENTER", 0, 0)
             end
         end
     end
@@ -403,6 +415,18 @@ do
         local bg = btn:CreateTexture(nil, "BACKGROUND")
         bg:SetAllPoints(); bg:SetTexture(0.055, 0.045, 0.032, 0.95)
         btn.bg = bg
+
+        -- Active glow pill: a soft rounded gold halo behind the selected tab.
+        -- Only shown when this tab is active (managed by UpdateTabAppearance).
+        -- Drawn below bg via draw layer but above the frame's backdrop.
+        local activeGlow = btn:CreateTexture(nil, "BACKGROUND", nil, 2)
+        activeGlow:SetPoint("TOPLEFT", -2, 2)
+        activeGlow:SetPoint("BOTTOMRIGHT", 2, -2)
+        activeGlow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+        activeGlow:SetBlendMode("ADD")
+        activeGlow:SetVertexColor(0.96, 0.78, 0.26, 0.45)
+        activeGlow:Hide()
+        btn.activeGlow = activeGlow
 
         local topLine = btn:CreateTexture(nil, "OVERLAY")
         topLine:SetHeight(2)
