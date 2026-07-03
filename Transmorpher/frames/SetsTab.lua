@@ -27,7 +27,7 @@ function ns.InitSetsTab(parent)
     local listContainer = CreateFrame("Frame", nil, frame)
     listContainer:SetPoint("TOPLEFT", 4, -4)
     listContainer:SetPoint("BOTTOMLEFT", 4, 4)
-    listContainer:SetWidth(200)
+    listContainer:SetWidth(220)
     listContainer:SetBackdrop({
         bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -43,7 +43,7 @@ function ns.InitSetsTab(parent)
     local selectedSet
 
     local filterBtn = CreateFrame("Button", nil, listContainer)
-    filterBtn:SetSize(180, 24)
+    filterBtn:SetSize(200, 24)
     filterBtn:SetPoint("TOP", 0, -8)
 
     local filterBtnBg = filterBtn:CreateTexture(nil, "BACKGROUND")
@@ -153,7 +153,7 @@ function ns.InitSetsTab(parent)
     end)
 
     local searchFrame = CreateFrame("Frame", nil, listContainer)
-    searchFrame:SetSize(180, 24)
+    searchFrame:SetSize(200, 24)
     searchFrame:SetPoint("TOP", filterBtn, "BOTTOM", 0, -8)
     searchFrame:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
@@ -222,13 +222,33 @@ function ns.InitSetsTab(parent)
         scrollChild:SetWidth(width)
         for _, btn in ipairs(setsButtons) do
             btn:SetWidth(math.max(1, width - 4))
-            if btn.text then btn.text:SetWidth(math.max(1, width - 44)) end
+            if btn.text then btn.text:SetWidth(math.max(1, width - 52)) end
+            if btn.tag then btn.tag:SetWidth(math.max(1, width - 52)) end
         end
     end)
 
     local model = ns.CreateDressingRoom("$parentModel", frame)
     model:SetPoint("TOPLEFT", listContainer, "TOPRIGHT", 10, 0)
     model:SetPoint("BOTTOMRIGHT", -4, 60)
+
+    -- Uniform 1px gold hairline card border around the sets model, matching the
+    -- theme used across the rest of the UI (the main Character Preview keeps its
+    -- premium multi-layer bevel; secondary panels use this clean standard tier).
+    local modelBorder = CreateFrame("Frame", nil, frame)
+    modelBorder:SetPoint("TOPLEFT", model, "TOPLEFT", -2, 2)
+    modelBorder:SetPoint("BOTTOMRIGHT", model, "BOTTOMRIGHT", 2, -2)
+    modelBorder:SetBackdrop(ns.Theme.panel)
+    modelBorder:SetBackdropColor(0, 0, 0, 0)
+    modelBorder:SetBackdropBorderColor(ns.Colors.borderHair[1], ns.Colors.borderHair[2], ns.Colors.borderHair[3], ns.Colors.borderHair[4])
+    modelBorder:SetFrameStrata(model:GetFrameStrata())
+    modelBorder:SetFrameLevel(model:GetFrameLevel() - 1)
+    local modelBorderSheen = modelBorder:CreateTexture(nil, "OVERLAY")
+    modelBorderSheen:SetTexture(ns.Assets.white)
+    modelBorderSheen:SetHeight(1)
+    modelBorderSheen:SetPoint("TOPLEFT", 2, -2)
+    modelBorderSheen:SetPoint("TOPRIGHT", -2, -2)
+    modelBorderSheen:SetVertexColor(1.0, 0.86, 0.36, 0.22)
+    model.border = modelBorder
 
     model.backgroundTextures = {}
     local bgKeys = "human,nightelf,dwarf,gnome,draenei,orc,scourge,tauren,troll,bloodelf"
@@ -436,12 +456,17 @@ function ns.InitSetsTab(parent)
     local function UpdatePreview()
         model:Reset()
         model:SetUnit("player")
-        model:Undress()
         ShowModelBackground()
 
         if not selectedSet then
+            -- No set selected: leave the model showing the player's currently-equipped
+            -- gear (SetUnit re-stamps it). Do NOT Undress — a naked grey model with
+            -- empty slots is a poor default state.
             return
         end
+
+        -- A set is selected: undress first so only the set's items show.
+        model:Undress()
 
         local currentSet = selectedSet
         local mainHand, offHand, ranged
@@ -483,11 +508,13 @@ function ns.InitSetsTab(parent)
 
         for _, btn in ipairs(setsButtons) do
             if btn.setData == setData then
-                btn.bg:SetTexture(0.6, 0.5, 0.2, 0.4)
-                btn.text:SetTextColor(1, 1, 1)
+                btn.bg:SetTexture(ns.Colors.rowSelected[1], ns.Colors.rowSelected[2], ns.Colors.rowSelected[3], ns.Colors.rowSelected[4])
+                btn.text:SetTextColor(ns.Colors.textHighlight[1], ns.Colors.textHighlight[2], ns.Colors.textHighlight[3])
+                if btn.tag then btn.tag:SetTextColor(ns.Colors.textSecondary[1], ns.Colors.textSecondary[2], ns.Colors.textSecondary[3]) end
             else
                 btn.bg:SetTexture(0, 0, 0, 0)
-                btn.text:SetTextColor(1, 0.82, 0)
+                btn.text:SetTextColor(ns.Colors.textAccent[1], ns.Colors.textAccent[2], ns.Colors.textAccent[3])
+                if btn.tag then btn.tag:SetTextColor(ns.Colors.textMutedGold[1], ns.Colors.textMutedGold[2], ns.Colors.textMutedGold[3]) end
             end
         end
     end
@@ -521,7 +548,7 @@ function ns.InitSetsTab(parent)
             local btn = setsButtons[i]
             if not btn then
                 btn = CreateFrame("Button", nil, scrollChild)
-                btn:SetSize(math.max(1, scrollChild:GetWidth() - 4), 32)
+                btn:SetSize(math.max(1, scrollChild:GetWidth() - 4), 40)
 
                 local bg = btn:CreateTexture(nil, "BACKGROUND")
                 bg:SetAllPoints()
@@ -535,32 +562,45 @@ function ns.InitSetsTab(parent)
                 hl:SetVertexColor(0.6, 0.5, 0.2, 0.3)
 
                 local icon = btn:CreateTexture(nil, "ARTWORK")
-                icon:SetSize(26, 26)
+                icon:SetSize(32, 32)
                 icon:SetPoint("LEFT", 4, 0)
                 icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
                 btn.icon = icon
 
                 local border = btn:CreateTexture(nil, "OVERLAY")
-                border:SetSize(26, 26)
+                border:SetSize(32, 32)
                 border:SetPoint("CENTER", icon, "CENTER", 0, 0)
                 border:SetTexture("Interface\\Buttons\\UI-Quickslot2")
                 border:SetVertexColor(0.6, 0.6, 0.6)
 
                 local text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-                text:SetPoint("LEFT", icon, "RIGHT", 8, 0)
+                text:SetPoint("TOPLEFT", icon, "TOPRIGHT", 8, -2)
                 text:SetJustifyH("LEFT")
-                text:SetWidth(math.max(1, scrollChild:GetWidth() - 44))
+                text:SetWidth(math.max(1, scrollChild:GetWidth() - 52))
                 text:SetWordWrap(false)
                 text:SetTextColor(1, 0.82, 0)
                 btn.text = text
+
+                -- Differentiation subtext: shows the set's description (e.g. "Tier 1 Priest
+                -- Raid Set", "Dungeon 2 Rogue Set") so duplicate names like "Aegis Battlegear"
+                -- can be told apart at a glance.
+                local tag = btn:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+                tag:SetPoint("TOPLEFT", text, "BOTTOMLEFT", 0, -1)
+                tag:SetPoint("RIGHT", text, "RIGHT", 0, 0)
+                tag:SetJustifyH("LEFT")
+                tag:SetWordWrap(false)
+                tag:SetTextColor(0.62, 0.58, 0.42)
+                btn.tag = tag
 
                 setsButtons[i] = btn
             end
 
             btn:SetWidth(math.max(1, scrollChild:GetWidth() - 4))
-            btn.text:SetWidth(math.max(1, scrollChild:GetWidth() - 44))
+            btn.text:SetWidth(math.max(1, scrollChild:GetWidth() - 52))
             btn:SetPoint("TOPLEFT", 0, -yOffset)
             btn.text:SetText(setData.name)
+            btn.tag:SetText(setData.description or setData.class or "")
+            btn.tag:SetTextColor(0.62, 0.58, 0.42)
             btn.setData = setData
             btn:Show()
 
@@ -587,7 +627,7 @@ function ns.InitSetsTab(parent)
                 SelectSet(setData)
             end)
 
-            yOffset = yOffset + 32
+            yOffset = yOffset + 42
         end
 
         scrollChild:SetHeight(math.max(yOffset, 1))
@@ -623,8 +663,11 @@ function ns.InitSetsTab(parent)
     end
     SelectFilter("ALL")
     BuildList()
+    -- Default the model to the player's currently-equipped gear (NOT undressed) so
+    -- the user sees the sets applied in the context of their real character. When a
+    -- set is selected, UpdatePreview() calls model:Undress() before trying on the
+    -- set's items — so only the initial "no set selected" state is the equipped one.
     model:SetUnit("player")
-    model:Undress()
     ShowModelBackground()
     frame:HookScript("OnShow", function()
         UpdatePreview()

@@ -51,8 +51,10 @@ end
 local function UpdateSelectionBorder(self, dr)
     if dr.itemId == self.selectedItemId then
         dr:SetBackdropBorderColor(unpack(selectedItemBackdropBorderColor))
+        if dr.SetTileState then dr:SetTileState("selected") end
     else
         dr:SetBackdropBorderColor(unpack(itemBackdropBorderColor))
+        if dr.SetTileState then dr:SetTileState("normal") end
     end
 end
 
@@ -76,8 +78,10 @@ local function button_OnClick(self, button)
         for _, dr in ipairs(mainFrame.dressingRooms) do
             if dr.itemId == clickedId then
                 dr:SetBackdropBorderColor(unpack(selectedItemBackdropBorderColor))
+                if dr.SetTileState then dr:SetTileState("selected") end
             else
                 dr:SetBackdropBorderColor(unpack(itemBackdropBorderColor))
+                if dr.SetTileState then dr:SetTileState("normal") end
             end
         end
     end
@@ -89,21 +93,6 @@ local function button_OnClick(self, button)
     end
 end
 
-
-local function button_OnEnter(self, ...)
-    local onEnter = self:GetParent():GetParent().onEnter
-    if onEnter ~= nil then
-        onEnter(self, ...)
-    end
-end
-
-
-local function button_OnLeave(self, ...)
-    local onLeave = self:GetParent():GetParent().onLeave
-    if onLeave ~= nil then
-        onLeave(self, ...)
-    end
-end
 
 
 local recycler = {
@@ -123,6 +112,7 @@ local recycler = {
                 dr:SetBackdrop(itemBackdrop)
                 dr:SetBackdropColor(unpack(itemBackdropColor))
                 dr:SetBackdropBorderColor(unpack(itemBackdropBorderColor))
+                ns.StyleItemTile(dr)
                 dr:EnableDragRotation(false)
                 dr:EnableMouseWheel(false)
                 dr.queriedLabel = dr:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -143,8 +133,22 @@ local recycler = {
                 btn:SetHighlightTexture(previewHighlightTexture)
                 btn:EnableMouse(true)
                 btn:RegisterForClicks("LeftButtonUp")
-                btn:SetScript("OnEnter", button_OnEnter)
-                btn:SetScript("OnLeave", button_OnLeave)
+                btn:SetScript("OnEnter", function(self, ...)
+                    local onEnter = self:GetParent():GetParent().onEnter
+                    if onEnter ~= nil then onEnter(self, ...) end
+                    local dr = self:GetParent()
+                    if dr.SetTileState and dr.itemId ~= self:GetParent():GetParent().selectedItemId then
+                        dr:SetTileState("hover")
+                    end
+                end)
+                btn:SetScript("OnLeave", function(self, ...)
+                    local onLeave = self:GetParent():GetParent().onLeave
+                    if onLeave ~= nil then onLeave(self, ...) end
+                    local dr = self:GetParent()
+                    if dr.SetTileState and dr.itemId ~= self:GetParent():GetParent().selectedItemId then
+                        dr:SetTileState("normal")
+                    end
+                end)
                 btn:SetScript("OnClick", button_OnClick)
                 dr.button = btn
                 table.insert(result, 1, dr)
@@ -242,6 +246,7 @@ local function PreviewList_SetupModel(self, width, height, x, y, z, facing, sequ
                 dr:SetPoint("TOPLEFT", self, "TOPLEFT", width * (w - 1) + gapW , -height * (h - 1) - gapH)
                 dr:SetSize(width, height)
                 dr:SetBackdropBorderColor(unpack(itemBackdropBorderColor))
+                if dr.SetTileState then dr:SetTileState("normal") end
             end
         end
     end
@@ -322,6 +327,7 @@ local function PreviewList_Update(self)
             if entry == nil then
                 dr:OnUpdateModel(nil)
                 dr:ClearModel()
+                if dr.SetTileState then dr:SetTileState("normal") end
                 dr:Hide()
             else
                 dr.itemId = entry.id
@@ -365,6 +371,7 @@ local function PreviewList_Update(self)
         if itemId == nil then
             dr:OnUpdateModel(nil)
             dr:ClearModel()
+            if dr.SetTileState then dr:SetTileState("normal") end
             dr:Hide()
         else
             dr.itemId = itemId
@@ -408,8 +415,10 @@ local function PreviewList_SelectByItemId(self, itemId)
         for _, dr in ipairs(self.dressingRooms) do
             if dr.itemId == itemId then
                 dr:SetBackdropBorderColor(unpack(selectedItemBackdropBorderColor))
+                if dr.SetTileState then dr:SetTileState("selected") end
             else
                 dr:SetBackdropBorderColor(unpack(itemBackdropBorderColor))
+                if dr.SetTileState then dr:SetTileState("normal") end
             end
         end
     end

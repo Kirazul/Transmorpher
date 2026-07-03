@@ -26,3 +26,6 @@ StealthMorpher/build/
 
 # Third-party
 StealthMorpher/third_party/
+
+# Windows reserved files
+nul
