@@ -38,7 +38,7 @@ do
         insets = { left = 1, right = 1, top = 1, bottom = 1 },
     })
     previewHeader:SetBackdropColor(0.045, 0.040, 0.030, 0.97)
-    previewHeader:SetBackdropBorderColor(0.78, 0.62, 0.22, 0.85)
+    previewHeader:SetBackdropBorderColor(0.62, 0.49, 0.16, 0.85)
 
     -- Warm vertical gradient fill for depth
     local headerGlow = previewHeader:CreateTexture(nil, "BACKGROUND")
