@@ -8,9 +8,9 @@ local mainFrame = ns.mainFrame
 local ACTION_GAP = 6
 local ACTION_WIDTH = math.floor(((mainFrame.dressingRoom:GetWidth() or 400) - ACTION_GAP * 3) / 4)
 local ACTION_REST_BG = { 0.125, 0.085, 0.025, 0.99 }
-local ACTION_REST_BD = { 0.92, 0.70, 0.20, 0.98 }
+local ACTION_REST_BD = { 0.62, 0.49, 0.16, 0.85 }
 local ACTION_HOVER_BG = { 0.205, 0.145, 0.042, 1.00 }
-local ACTION_HOVER_BD = { 1.00, 0.86, 0.34, 1.00 }
+local ACTION_HOVER_BD = { 1.00, 0.82, 0.24, 1.00 }
 local ACTION_TEXT = "|cffF5C842%s|r"
 
 -- ============================================================
